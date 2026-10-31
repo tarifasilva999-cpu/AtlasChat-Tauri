@@ -1,0 +1,4387 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Atlas</title>
+<meta name="description" content="Atlas — private local AI powered by Apex 7.3." />
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0d0d0d;
+  --rail:#1a1a1a;
+  --sidebar:#151515;
+  --surface:#191919;
+  --surface-2:#222222;
+  --user:#2a2a2a;
+  --text:#f3f3f0;
+  --text-2:#c5c4be;
+  --muted:#7b7a75;
+  --quiet:#474744;
+  --line:#252525;
+  --line-2:#313131;
+  --shadow:0 12px 28px rgba(0,0,0,.25);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --serif:"New York","Iowan Old Style","Baskerville","Times New Roman",serif;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --rail-w:58px;
+  --sidebar-w:272px;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f7f7f5;
+  --rail:#ececea;
+  --sidebar:#f1f1ef;
+  --surface:#ffffff;
+  --surface-2:#e9e9e5;
+  --user:#e9e9e7;
+  --text:#151514;
+  --text-2:#444440;
+  --muted:#7b7973;
+  --quiet:#b1afa8;
+  --line:#ddddda;
+  --line-2:#d1d1cc;
+  --shadow:0 12px 28px rgba(0,0,0,.08);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+button,textarea{font:inherit}
+button{color:inherit}
+::selection{background:var(--text);color:var(--bg)}
+
+.app{height:100%;position:relative}
+
+/* LEFT RAIL */
+.rail{
+  position:fixed;
+  z-index:30;
+  inset:0 auto 0 0;
+  width:var(--rail-w);
+  background:var(--rail);
+  border-right:1px solid var(--line);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:14px 0 12px;
+}
+.rail-button{
+  width:36px;height:36px;
+  border:0;padding:0;
+  display:grid;place-items:center;
+  background:transparent;
+  color:#eee;
+  cursor:pointer;
+  border-radius:10px;
+  transition:background .14s ease,transform .14s ease;
+}
+html[data-theme="light"] .rail-button{color:#242423}
+.rail-button:hover{background:rgba(127,127,127,.12)}
+.rail-button:active{transform:scale(.95)}
+.rail-button svg{
+  width:22px;height:22px;
+  stroke:currentColor;fill:none;stroke-width:1.65;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.rail-spacer{flex:1}
+.rail-status{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--quiet);
+  opacity:0;
+  transition:opacity .2s ease,background .2s ease;
+}
+.rail-status.visible{opacity:1}
+.rail-status.ready{background:#8faa88}
+.rail-status.busy{background:#b9a06a;animation:dotPulse 1.1s ease-in-out infinite}
+.rail-status.error{background:#ba746d}
+@keyframes dotPulse{50%{opacity:.32}}
+
+/* SIDEBAR */
+.sidebar{
+  position:fixed;
+  z-index:25;
+  inset:0 auto 0 var(--rail-w);
+  width:var(--sidebar-w);
+  background:var(--sidebar);
+  border-right:1px solid var(--line);
+  transform:translateX(calc(-1 * var(--sidebar-w)));
+  transition:transform .24s cubic-bezier(.22,.8,.2,1);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.app.sidebar-open .sidebar{
+  transform:translateX(0);
+  box-shadow:16px 0 40px rgba(0,0,0,.14);
+}
+.sidebar-head{
+  height:58px;flex:0 0 58px;
+  display:flex;align-items:center;
+  padding:0 15px;
+  border-bottom:1px solid var(--line);
+}
+.sidebar-title{
+  flex:1;
+  font-size:12px;
+  font-weight:590;
+  letter-spacing:-.018em;
+}
+.sidebar-close{
+  width:30px;height:30px;border:0;background:transparent;
+  color:var(--muted);border-radius:9px;cursor:pointer;
+  display:grid;place-items:center;
+}
+.sidebar-close:hover{background:var(--surface-2);color:var(--text)}
+.sidebar-close svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.55}
+
+.sidebar-new-wrap{padding:10px 10px 7px}
+.sidebar-new{
+  width:100%;height:38px;
+  border:0;background:transparent;
+  border-radius:10px;color:var(--text-2);
+  display:flex;align-items:center;gap:10px;
+  padding:0 10px;cursor:pointer;font-size:11px;text-align:left;
+}
+.sidebar-new:hover{background:var(--surface-2)}
+.sidebar-new svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.55}
+
+.sidebar-label{
+  padding:12px 14px 7px;
+  color:var(--quiet);
+  font-size:9px;
+  font-weight:520;
+}
+.history{
+  min-height:0;flex:1;overflow:auto;
+  padding:0 8px 10px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-2) transparent;
+}
+.history-item{
+  position:relative;
+  width:100%;min-height:38px;
+  border:0;background:transparent;
+  border-radius:10px;
+  display:flex;align-items:center;
+  padding:7px 30px 7px 10px;
+  color:var(--muted);cursor:pointer;text-align:left;
+}
+.history-item:hover{background:var(--surface-2);color:var(--text-2)}
+.history-item.active{background:var(--surface-2);color:var(--text)}
+.history-copy{min-width:0}
+.history-title{
+  font-size:10.5px;line-height:1.3;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.history-time{margin-top:2px;color:var(--quiet);font-size:8px}
+.history-delete{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:25px;height:25px;border:0;background:transparent;
+  color:var(--quiet);border-radius:8px;cursor:pointer;opacity:0;
+}
+.history-item:hover .history-delete{opacity:1}
+.history-delete:hover{background:var(--surface);color:var(--text)}
+.sidebar-foot{
+  padding:8px;
+  border-top:1px solid var(--line);
+}
+.side-action{
+  width:100%;height:36px;border:0;background:transparent;
+  color:var(--muted);border-radius:10px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 10px;cursor:pointer;font-size:10px;text-align:left;
+}
+.side-action:hover{background:var(--surface-2);color:var(--text)}
+.side-action svg{
+  width:15px;height:15px;
+  stroke:currentColor;fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+
+/* MAIN */
+.main{
+  position:fixed;
+  inset:0 0 0 var(--rail-w);
+  background:var(--bg);
+}
+.chat{
+  position:absolute;inset:0;
+  overflow:auto;
+  padding:22px 28px 154px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-2) transparent;
+}
+.thread{
+  width:min(760px,100%);
+  margin:0 auto;
+  padding-top:26px;
+}
+
+/* HOME */
+.home{
+  min-height:calc(100vh - 190px);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:40px 0 80px;
+}
+.home-overline{
+  margin-bottom:20px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:520;
+}
+.home h1{
+  max-width:690px;
+  margin:0;
+  font-size:clamp(46px,6.2vw,76px);
+  font-weight:300;
+  line-height:.96;
+  letter-spacing:-.058em;
+}
+.home h1 em{
+  display:block;
+  margin-top:6px;
+  font:italic 400 1em/1 var(--serif);
+}
+.home p{
+  max-width:520px;
+  margin:22px 0 0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.72;
+}
+.home-actions{
+  margin-top:31px;
+  display:flex;
+  gap:22px;
+  flex-wrap:wrap;
+}
+.home-action{
+  position:relative;
+  padding:5px 14px 5px 0;
+  border:0;background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:10px;
+}
+.home-action::after{
+  content:"↗";
+  position:absolute;right:0;top:4px;color:var(--quiet);
+}
+.home-action:hover{color:var(--text)}
+
+/* CHAT TITLE */
+.chat-title{
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  color:var(--quiet);
+  font-size:17px;
+  font-weight:420;
+  letter-spacing:-.025em;
+  padding:0 2px 12px;
+}
+.chat-title.generating{
+  animation:titlePulse 1.4s ease-in-out infinite;
+}
+@keyframes titlePulse{50%{opacity:.45}}
+
+/* MESSAGES */
+.message{
+  display:flex;
+  flex-direction:column;
+  padding:14px 0;
+}
+.message.user{
+  align-items:flex-end;
+  padding-top:22px;
+  padding-bottom:18px;
+}
+.message.assistant{
+  align-items:flex-start;
+  padding-top:8px;
+  padding-bottom:20px;
+}
+.message-shell{max-width:min(86%,690px)}
+.message.user .message-shell{
+  max-width:min(68%,540px);
+  background:var(--user);
+  border-radius:24px;
+  corner-shape:squircle;
+  padding:10px 18px;
+}
+.message.assistant .message-shell{
+  padding:0;
+  max-width:min(88%,700px);
+}
+.message-text{
+  color:var(--text-2);
+  font-size:13px;
+  line-height:1.72;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.message.user .message-text{
+  color:var(--text);
+  font-size:12.8px;
+  line-height:1.5;
+}
+
+/* THINKING */
+.thinking{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  color:var(--muted);
+  font-size:13px;
+  animation:thinkingBreath 1.55s ease-in-out infinite;
+}
+@keyframes thinkingBreath{
+  0%,100%{opacity:.38}
+  50%{opacity:.9}
+}
+.pause-spinner{
+  display:inline-block;
+  width:10px;height:10px;margin-left:7px;
+  vertical-align:-1px;
+  border:1.25px solid var(--line-2);
+  border-top-color:var(--muted);
+  border-radius:50%;
+  animation:spin .72s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cursor{
+  display:inline-block;
+  width:1px;height:1em;
+  vertical-align:-.1em;
+  margin-left:2px;
+  background:currentColor;
+  animation:blink .85s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+
+/* COMPOSER */
+.composer-wrap{
+  position:fixed;
+  z-index:15;
+  left:var(--rail-w);right:0;bottom:24px;
+  display:flex;justify-content:center;
+  padding:0 18px;
+  pointer-events:none;
+}
+.composer{
+  pointer-events:auto;
+  width:min(520px,calc(100vw - var(--rail-w) - 36px));
+  min-height:60px;
+  display:flex;align-items:flex-end;gap:8px;
+  padding:8px 9px 8px 21px;
+  background:var(--surface);
+  border:1px solid color-mix(in srgb,var(--line) 80%,transparent);
+  border-radius:27px;
+  corner-shape:squircle;
+  box-shadow:0 12px 26px rgba(0,0,0,.25);
+}
+html[data-theme="light"] .composer{box-shadow:0 10px 24px rgba(0,0,0,.08)}
+textarea{
+  flex:1;min-height:29px;max-height:150px;
+  padding:8px 0 5px;border:0;outline:0;resize:none;
+  background:transparent;color:var(--text);
+  font-size:13px;line-height:1.45;
+}
+textarea::placeholder{color:var(--quiet)}
+.send{
+  width:42px;height:42px;flex:0 0 42px;
+  border:0;border-radius:50%;
+  display:grid;place-items:center;
+  background:#f5f5f2;color:#111;
+  cursor:pointer;
+  transition:transform .14s ease,opacity .14s ease;
+}
+html[data-theme="light"] .send{background:#171716;color:#fff}
+.send:hover{transform:translateY(-1px)}
+.send:active{transform:scale(.95)}
+.send:disabled{opacity:.28;cursor:default;transform:none}
+.send svg{
+  width:17px;height:17px;
+  stroke:currentColor;fill:none;stroke-width:1.75;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+
+/* LOADER */
+.loader{
+  position:fixed;
+  z-index:18;
+  left:calc(var(--rail-w) + 50%);
+  transform:translateX(calc(-50% - var(--rail-w)/2));
+  bottom:96px;
+  min-width:250px;
+  max-width:min(350px,calc(100vw - var(--rail-w) - 36px));
+  padding:9px 12px 10px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:13px;
+  box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.loader.show{
+  opacity:1;
+  transform:translateX(calc(-50% - var(--rail-w)/2)) translateY(-2px);
+}
+.loader-line{
+  display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+}
+.loader-title{font-size:9.5px;font-weight:530;color:var(--text-2)}
+.loader-amount{font:7px var(--mono);color:var(--muted)}
+.loader-track{
+  height:2px;margin-top:8px;overflow:hidden;
+  background:var(--line);border-radius:999px;
+}
+.loader-bar{
+  height:100%;width:0%;
+  background:var(--text);border-radius:999px;
+  transition:width .16s ease;
+}
+.loader-track.indeterminate .loader-bar{
+  width:26%;
+  animation:sweep 1.1s cubic-bezier(.45,0,.2,1) infinite;
+}
+@keyframes sweep{from{transform:translateX(-130%)}to{transform:translateX(500%)}}
+
+/* PANELS */
+.scrim{
+  position:fixed;z-index:60;inset:0;
+  display:none;place-items:center;padding:18px;
+  background:rgba(0,0,0,.36);backdrop-filter:blur(10px);
+}
+.scrim.show{display:grid}
+.panel{
+  width:min(500px,100%);
+  max-height:min(620px,calc(100vh - 36px));
+  overflow:auto;
+  background:var(--surface);
+  border:1px solid var(--line-2);
+  border-radius:22px;
+  corner-shape:squircle;
+  box-shadow:var(--shadow);
+  padding:18px;
+}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}
+.panel h2{margin:0;font-size:15px;font-weight:590;letter-spacing:-.02em}
+.panel-close{
+  width:32px;height:32px;border:0;background:transparent;
+  color:var(--muted);border-radius:10px;cursor:pointer;font-size:18px;
+}
+.panel-close:hover{background:var(--surface-2);color:var(--text)}
+.info-grid,.memory-list{border-top:1px solid var(--line)}
+.info-row{
+  display:grid;grid-template-columns:125px 1fr;gap:16px;
+  padding:11px 0;border-bottom:1px solid var(--line);
+  font-size:10px;line-height:1.55;
+}
+.info-row dt{color:var(--muted)}
+.info-row dd{margin:0;color:var(--text-2)}
+.memory-row{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--line);
+  font-size:10px;line-height:1.55;color:var(--text-2);
+}
+.memory-tabs{
+  display:flex;gap:4px;margin-bottom:12px;
+}
+.memory-tab{
+  border:0;background:transparent;color:var(--muted);
+  border-radius:9px;padding:7px 9px;cursor:pointer;font-size:9px;
+}
+.memory-tab.active{background:var(--surface-2);color:var(--text)}
+.text-btn{border:0;background:transparent;color:var(--muted);padding:0;cursor:pointer;font-size:9px}
+.text-btn:hover{color:var(--text)}
+.panel-foot{display:flex;justify-content:flex-end;margin-top:13px}
+
+@media(max-width:760px){
+  :root{--rail-w:52px;--sidebar-w:252px}
+  .rail{padding-top:10px}
+  .rail-button{width:34px;height:34px}
+  .chat{padding:18px 14px 138px}
+  .thread{padding-top:18px}
+  .home{min-height:calc(100vh - 160px)}
+  .home h1{font-size:44px}
+  .chat-title{font-size:15px}
+  .message.user .message-shell{max-width:84%}
+  .message.assistant .message-shell{max-width:94%}
+  .composer-wrap{bottom:12px;padding:0 12px}
+  .composer{width:min(520px,calc(100vw - var(--rail-w) - 24px));min-height:56px;border-radius:24px}
+  .send{width:40px;height:40px;flex-basis:40px}
+  .loader{bottom:80px}
+}
+
+/* B4 — INSTALLABLE / MOBILE */
+html,body{height:100dvh}
+body{
+  overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.rail{
+  padding-top:max(14px,env(safe-area-inset-top));
+  padding-bottom:max(12px,env(safe-area-inset-bottom));
+}
+.sidebar{
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.composer-wrap{
+  bottom:max(24px,env(safe-area-inset-bottom));
+}
+@media(display-mode:standalone){
+  .rail{
+    padding-top:max(16px,env(safe-area-inset-top));
+  }
+  .composer-wrap{
+    bottom:max(14px,env(safe-area-inset-bottom));
+  }
+}
+.install-badge{
+  display:none;
+  margin-left:auto;
+  color:var(--quiet);
+  font-size:8px;
+}
+.install-badge.show{display:inline}
+.data-actions{
+  display:grid;
+  gap:7px;
+  margin-top:6px;
+}
+.data-button{
+  width:100%;
+  min-height:42px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--text-2);
+  border-radius:11px;
+  padding:9px 11px;
+  text-align:left;
+  cursor:pointer;
+  font-size:10px;
+}
+.data-button:hover{background:var(--surface-2)}
+.data-button strong{
+  display:block;
+  color:var(--text);
+  font-size:10px;
+  font-weight:570;
+  margin-bottom:2px;
+}
+.data-button span{
+  color:var(--muted);
+  font-size:8.5px;
+}
+.storage-status{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.65;
+}
+.storage-status b{color:var(--text-2);font-weight:540}
+.install-copy{
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.65;
+}
+.install-copy strong{color:var(--text);font-weight:570}
+.toast{
+  position:fixed;
+  z-index:90;
+  left:calc(var(--rail-w) + 50%);
+  bottom:max(92px,calc(env(safe-area-inset-bottom) + 82px));
+  transform:translate(-50%,10px);
+  opacity:0;
+  pointer-events:none;
+  padding:9px 12px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow:var(--shadow);
+  color:var(--text-2);
+  font-size:9px;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.toast.show{
+  opacity:1;
+  transform:translate(-50%,0);
+}
+@media(max-width:760px){
+  .chat{
+    padding-bottom:calc(128px + env(safe-area-inset-bottom));
+  }
+  .composer-wrap{
+    bottom:max(10px,env(safe-area-inset-bottom));
+  }
+  .composer{
+    width:min(520px,calc(100vw - var(--rail-w) - 20px));
+  }
+  .toast{
+    left:calc(var(--rail-w) + (100vw - var(--rail-w))/2);
+  }
+}
+
+
+/* B8 — RESPONSE UI */
+.message{
+  position:relative;
+}
+.message-shell{
+  position:relative;
+}
+.message-actions{
+  display:flex;
+  align-items:center;
+  gap:2px;
+  margin-top:5px;
+  min-height:26px;
+  opacity:0;
+  transform:translateY(-2px);
+  transition:opacity .13s ease,transform .13s ease;
+}
+.message.user .message-actions{justify-content:flex-end}
+.message:hover .message-actions,
+.message:focus-within .message-actions{
+  opacity:1;
+  transform:none;
+}
+.message-action{
+  width:27px;
+  height:27px;
+  border:0;
+  background:transparent;
+  color:var(--quiet);
+  border-radius:8px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  transition:background .12s ease,color .12s ease,transform .12s ease;
+}
+.message-action:hover{background:var(--surface-2);color:var(--text-2)}
+.message-action:active{transform:scale(.94)}
+.message-action svg{
+  width:13px;height:13px;
+  stroke:currentColor;fill:none;stroke-width:1.55;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.message-action.copied{color:#91aa8b}
+
+/* Markdown */
+.message.assistant .message-text{
+  white-space:normal;
+}
+.md{
+  color:var(--text-2);
+  font-size:13px;
+  line-height:1.72;
+}
+.md > :first-child{margin-top:0}
+.md > :last-child{margin-bottom:0}
+.md p{margin:0 0 12px}
+.md h1,.md h2,.md h3{
+  color:var(--text);
+  font-weight:590;
+  letter-spacing:-.025em;
+  line-height:1.18;
+  margin:21px 0 9px;
+}
+.md h1{font-size:20px;font-weight:700}
+.md h2{font-size:16px}
+.md h3{font-size:14px}
+.md ul,.md ol{
+  margin:7px 0 13px;
+  padding-left:21px;
+}
+.md li{margin:4px 0}
+.md blockquote{
+  margin:12px 0;
+  padding:1px 0 1px 13px;
+  border-left:2px solid var(--line-2);
+  color:var(--muted);
+}
+.md strong{color:var(--text);font-weight:620}
+.md em{font-family:var(--serif)}
+.md code:not(.code-body code){
+  font-family:var(--mono);
+  font-size:.9em;
+  color:var(--text);
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:1px 5px;
+}
+.md hr{
+  border:0;
+  border-top:1px solid var(--line);
+  margin:18px 0;
+}
+
+/* Code surfaces */
+.code-block{
+  margin:13px 0 15px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background:#111;
+  border-radius:15px;
+  corner-shape:squircle;
+}
+html[data-theme="light"] .code-block{
+  background:#f0f0ed;
+}
+.code-head{
+  height:35px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:0 8px 0 13px;
+  border-bottom:1px solid var(--line);
+}
+.code-lang{
+  min-width:0;
+  color:var(--muted);
+  font:8px var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.055em;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.code-copy{
+  width:28px;height:28px;
+  border:0;background:transparent;color:var(--muted);
+  border-radius:8px;cursor:pointer;
+  display:grid;place-items:center;
+}
+.code-copy:hover{background:var(--surface-2);color:var(--text)}
+.code-copy svg{
+  width:13px;height:13px;
+  stroke:currentColor;fill:none;stroke-width:1.55;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.code-copy.copied{color:#91aa8b}
+.code-body{
+  margin:0;
+  padding:14px 15px 15px;
+  overflow:auto;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-2) transparent;
+}
+.code-body code{
+  display:block;
+  min-width:max-content;
+  color:#e6e5df;
+  background:transparent;
+  font:11.5px/1.65 var(--mono);
+  tab-size:4;
+  white-space:pre;
+}
+html[data-theme="light"] .code-body code{color:#252522}
+
+/* Edit state */
+.edit-cancel{
+  display:none;
+  width:34px;height:34px;
+  flex:0 0 34px;
+  border:0;background:transparent;color:var(--muted);
+  border-radius:10px;
+  cursor:pointer;
+  place-items:center;
+}
+.composer.editing .edit-cancel{display:grid}
+.edit-cancel:hover{background:var(--surface-2);color:var(--text)}
+.edit-cancel svg{
+  width:14px;height:14px;
+  stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.composer.editing{
+  border-color:color-mix(in srgb,var(--text) 18%,var(--line));
+}
+
+/* Sidebar search */
+.sidebar-search-wrap{
+  padding:0 10px 7px;
+}
+.sidebar-search{
+  position:relative;
+}
+.sidebar-search input{
+  width:100%;
+  height:34px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  padding:0 9px 0 29px;
+  border-radius:9px;
+  font-size:10px;
+}
+.sidebar-search input::placeholder{color:var(--quiet)}
+.sidebar-search input:focus,
+.sidebar-search input:hover{background:var(--surface-2)}
+.sidebar-search svg{
+  position:absolute;
+  left:9px;top:50%;
+  transform:translateY(-50%);
+  width:12px;height:12px;
+  stroke:var(--quiet);fill:none;stroke-width:1.6;
+  pointer-events:none;
+}
+
+/* Friendly error surface */
+.local-error{
+  max-width:min(88%,700px);
+  color:var(--text-2);
+}
+.local-error-main{
+  font-size:13px;
+  line-height:1.65;
+}
+.error-details-button{
+  margin-top:7px;
+  border:0;
+  background:transparent;
+  color:var(--quiet);
+  padding:0;
+  font-size:9px;
+  cursor:pointer;
+}
+.error-details-button:hover{color:var(--text-2)}
+.error-details{
+  display:none;
+  margin-top:9px;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--muted);
+  background:var(--surface);
+  font:8px/1.55 var(--mono);
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.error-details.show{display:block}
+
+/* Temporary copy toast */
+.mini-toast{
+  position:fixed;
+  z-index:100;
+  left:50%;
+  bottom:max(102px,calc(env(safe-area-inset-bottom) + 92px));
+  transform:translate(-50%,8px);
+  opacity:0;
+  pointer-events:none;
+  color:var(--text-2);
+  background:var(--surface);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  border-radius:10px;
+  padding:7px 10px;
+  font-size:8.5px;
+  transition:opacity .14s ease,transform .14s ease;
+}
+.mini-toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:760px){
+  .message-actions{
+    opacity:.68;
+    transform:none;
+    min-height:24px;
+  }
+  .message-action{width:25px;height:25px}
+  .code-block{border-radius:13px}
+  .code-body{padding:12px 13px 13px}
+  .code-body code{font-size:11px}
+}
+
+
+/* B9 — MOBILE-SPECIFIC LAYOUT */
+.mobile-scrim{
+  position:fixed;
+  inset:0;
+  z-index:54;
+  border:0;
+  padding:0;
+  background:rgba(0,0,0,.34);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .18s ease;
+}
+.app.sidebar-open .mobile-scrim{
+  opacity:1;
+  pointer-events:auto;
+}
+
+@media(max-width:760px){
+  :root{
+    --mobile-top:52px;
+  }
+
+  .rail{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:0;
+    background:transparent;
+    border:0;
+    padding:0;
+    pointer-events:none;
+    z-index:60;
+  }
+  .rail-spacer{display:none}
+
+  .rail-button{
+    position:fixed;
+    left:12px;
+    top:max(10px,calc(env(safe-area-inset-top) + 4px));
+    width:38px;
+    height:38px;
+    border:1px solid color-mix(in srgb,var(--line) 82%,transparent);
+    background:color-mix(in srgb,var(--surface) 90%,transparent);
+    color:var(--text);
+    box-shadow:0 10px 24px rgba(0,0,0,.16);
+    border-radius:13px;
+    backdrop-filter:blur(16px) saturate(1.1);
+    -webkit-backdrop-filter:blur(16px) saturate(1.1);
+    pointer-events:auto;
+  }
+  .rail-button:hover{background:color-mix(in srgb,var(--surface) 96%,transparent)}
+  .rail-button svg{width:20px;height:20px}
+
+  .rail-status{
+    position:fixed;
+    right:14px;
+    top:max(26px,calc(env(safe-area-inset-top) + 20px));
+    width:8px;
+    height:8px;
+    border:2px solid var(--bg);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--line) 84%,transparent);
+    pointer-events:none;
+  }
+
+  .sidebar{
+    inset:0 auto 0 0;
+    width:min(84vw,316px);
+    transform:translateX(calc(-100% - 22px));
+    z-index:70;
+    box-shadow:none;
+    border-right:1px solid var(--line);
+  }
+  .app.sidebar-open .sidebar{
+    box-shadow:18px 0 44px rgba(0,0,0,.24);
+  }
+
+  .sidebar-head{
+    height:62px;
+    flex:0 0 62px;
+    padding:0 14px 0 16px;
+    padding-top:max(0px,env(safe-area-inset-top));
+  }
+  .sidebar-title{
+    font-size:13px;
+    letter-spacing:-.02em;
+  }
+  .sidebar-close{
+    width:32px;
+    height:32px;
+    border-radius:10px;
+  }
+  .sidebar-close svg{
+    width:16px;
+    height:16px;
+  }
+
+  .sidebar-new-wrap{padding:10px 10px 8px}
+  .sidebar-new{height:40px;font-size:11px}
+  .sidebar-search-wrap{padding:0 10px 8px}
+  .sidebar-search input{
+    height:36px;
+    font-size:11px;
+    border-radius:10px;
+  }
+  .sidebar-label{
+    padding:13px 14px 8px;
+    font-size:9px;
+  }
+  .history{
+    padding:0 8px max(10px,env(safe-area-inset-bottom));
+  }
+  .history-item{
+    min-height:42px;
+    border-radius:11px;
+    padding:8px 30px 8px 11px;
+  }
+
+  .chat{
+    inset:0;
+    padding:66px 14px calc(138px + env(safe-area-inset-bottom));
+  }
+  .thread{
+    width:100%;
+    padding-top:0;
+  }
+
+  .home{
+    min-height:calc(100dvh - 176px);
+    padding:28px 0 70px;
+  }
+  .home-overline{
+    margin-bottom:18px;
+    font-size:10px;
+  }
+  .home h1{
+    font-size:clamp(38px,10vw,56px);
+    line-height:.97;
+    letter-spacing:-.055em;
+  }
+  .home p{
+    margin-top:18px;
+    font-size:11px;
+    line-height:1.76;
+  }
+  .home-actions{
+    margin-top:26px;
+    gap:16px;
+  }
+
+  .chat-title{
+    min-height:38px;
+    font-size:15px;
+    padding:4px 0 8px;
+  }
+
+  .message{
+    margin-top:16px;
+  }
+  .message.assistant .message-shell{
+    max-width:100%;
+  }
+  .message.user .message-shell{
+    max-width:88%;
+  }
+  .message-text{
+    font-size:13px;
+    line-height:1.66;
+  }
+  .md{
+    font-size:13px;
+    line-height:1.76;
+  }
+  .message-actions{
+    margin-top:4px;
+    opacity:.82;
+  }
+  .message-action{
+    width:27px;
+    height:27px;
+  }
+
+  .composer-wrap{
+    left:0;
+    right:0;
+    bottom:max(10px,env(safe-area-inset-bottom));
+    padding:0 12px;
+  }
+  .composer{
+    width:min(740px,100%);
+    min-height:58px;
+    padding:8px 8px 8px 18px;
+    border-radius:22px;
+  }
+  textarea{
+    font-size:14px;
+    min-height:30px;
+  }
+  .send{
+    width:40px;
+    height:40px;
+    flex-basis:40px;
+  }
+  .edit-cancel{
+    width:36px;
+    height:36px;
+    flex-basis:36px;
+  }
+
+  .loader{
+    left:50%;
+    bottom:88px;
+    width:min(84vw,360px);
+    transform:translateX(-50%);
+  }
+
+  .toast{
+    left:50%;
+    bottom:max(90px,calc(env(safe-area-inset-bottom) + 78px));
+    transform:translateX(-50%);
+  }
+  .mini-toast{
+    bottom:max(92px,calc(env(safe-area-inset-bottom) + 80px));
+  }
+}
+
+@media(max-width:760px) and (display-mode:standalone){
+  .rail-button{
+    top:max(8px,calc(env(safe-area-inset-top) + 2px));
+  }
+  .rail-status{
+    top:max(24px,calc(env(safe-area-inset-top) + 18px));
+  }
+  .chat{
+    padding-top:max(62px,calc(env(safe-area-inset-top) + 18px));
+  }
+}
+
+
+/* =========================================================
+   B10 FOUNDATION
+   ========================================================= */
+
+.setup-overlay{
+  position:fixed;
+  z-index:140;
+  inset:0;
+  display:none;
+  place-items:center;
+  padding:28px;
+  background:var(--bg);
+  color:var(--text);
+}
+.setup-overlay.show{display:grid}
+.setup-content{
+  width:min(470px,100%);
+}
+.setup-overline{
+  color:var(--muted);
+  font:8px var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.065em;
+  margin-bottom:18px;
+}
+.setup-content h1{
+  margin:0;
+  font-size:clamp(36px,6vw,54px);
+  font-weight:310;
+  line-height:.98;
+  letter-spacing:-.052em;
+}
+.setup-tagline{
+  margin-top:8px;
+  font:italic 400 clamp(31px,5vw,46px)/1 var(--serif);
+  color:var(--text-2);
+  letter-spacing:-.035em;
+}
+.setup-copy{
+  max-width:430px;
+  margin:22px 0 0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.72;
+}
+.setup-progress-track{
+  height:3px;
+  margin-top:28px;
+  background:var(--line);
+  border-radius:999px;
+  overflow:hidden;
+}
+.setup-progress-bar{
+  width:8%;
+  height:100%;
+  background:var(--text);
+  border-radius:999px;
+  transition:width .25s cubic-bezier(.2,.8,.2,1);
+}
+.setup-steps{
+  margin-top:18px;
+  border-top:1px solid var(--line);
+}
+.setup-step{
+  min-height:43px;
+  display:grid;
+  grid-template-columns:18px 1fr auto;
+  align-items:center;
+  gap:9px;
+  border-bottom:1px solid var(--line);
+  color:var(--quiet);
+}
+.setup-step-dot{
+  width:13px;
+  height:13px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--line-2);
+  border-radius:50%;
+  font-size:8px;
+  line-height:1;
+}
+.setup-step-name{
+  font-size:10px;
+}
+.setup-step-detail{
+  color:var(--quiet);
+  font:7.5px var(--mono);
+  text-align:right;
+}
+.setup-step.active{
+  color:var(--text-2);
+}
+.setup-step.active .setup-step-dot{
+  border-color:var(--muted);
+  position:relative;
+}
+.setup-step.active .setup-step-dot::after{
+  content:"";
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:var(--text);
+  animation:setupPulse 1.15s ease-in-out infinite;
+}
+.setup-step.done{
+  color:var(--text-2);
+}
+.setup-step.done .setup-step-dot{
+  border-color:transparent;
+  color:#8faa88;
+}
+.setup-step.done .setup-step-detail{color:var(--muted)}
+.setup-step.error .setup-step-dot{
+  color:#ba746d;
+  border-color:#ba746d;
+}
+@keyframes setupPulse{50%{opacity:.25}}
+.setup-foot{
+  margin-top:13px;
+  color:var(--quiet);
+  font-size:8.5px;
+  line-height:1.55;
+}
+
+/* future build update */
+.update-banner{
+  position:fixed;
+  z-index:130;
+  left:50%;
+  top:max(14px,env(safe-area-inset-top));
+  transform:translate(-50%,-12px);
+  opacity:0;
+  pointer-events:none;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:8px 9px 8px 12px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:13px;
+  box-shadow:var(--shadow);
+  color:var(--text-2);
+  font-size:9px;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.update-banner.show{
+  opacity:1;
+  pointer-events:auto;
+  transform:translate(-50%,0);
+}
+.update-banner button{
+  border:0;
+  background:var(--text);
+  color:var(--bg);
+  border-radius:8px;
+  padding:6px 9px;
+  font-size:8.5px;
+  cursor:pointer;
+}
+
+/* New-chat state is a workspace, not the marketing page */
+.new-chat-home{
+  min-height:calc(100dvh - 185px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:24px 16px 82px;
+}
+.new-chat-home h1{
+  margin:0;
+  color:var(--text);
+  font-size:clamp(30px,5vw,43px);
+  font-weight:360;
+  letter-spacing:-.045em;
+  line-height:1.02;
+}
+.new-chat-home p{
+  margin:12px 0 0;
+  color:var(--muted);
+  font-size:10.5px;
+  line-height:1.6;
+}
+.new-chat-prompts{
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:8px 14px;
+  margin-top:24px;
+}
+.new-chat-prompt{
+  border:0;
+  padding:4px 0;
+  background:transparent;
+  color:var(--quiet);
+  cursor:pointer;
+  font-size:9px;
+}
+.new-chat-prompt:hover{color:var(--text-2)}
+
+/* Mobile sheets + menu reliability */
+@media(max-width:760px){
+  .scrim{
+    z-index:120;
+    place-items:end center;
+    padding:0;
+    background:rgba(0,0,0,.38);
+  }
+  .panel{
+    position:relative;
+    width:100%;
+    max-width:none;
+    max-height:min(80dvh,680px);
+    margin:0;
+    border-left:0;
+    border-right:0;
+    border-bottom:0;
+    border-radius:24px 24px 0 0;
+    corner-shape:squircle;
+    padding:25px 18px max(20px,calc(env(safe-area-inset-bottom) + 12px));
+    box-shadow:0 -18px 46px rgba(0,0,0,.20);
+    animation:sheetIn .2s cubic-bezier(.22,.8,.2,1);
+  }
+  .panel::before{
+    content:"";
+    position:absolute;
+    top:8px;
+    left:50%;
+    transform:translateX(-50%);
+    width:34px;
+    height:4px;
+    border-radius:999px;
+    background:var(--line-2);
+  }
+  @keyframes sheetIn{
+    from{transform:translateY(18px);opacity:.6}
+    to{transform:none;opacity:1}
+  }
+  .panel-head{margin-top:2px}
+  .info-row{grid-template-columns:105px 1fr}
+
+  .setup-overlay{padding:24px 20px}
+  .setup-content h1{font-size:39px}
+  .setup-tagline{font-size:34px}
+  .setup-copy{font-size:10.5px}
+  .setup-step{min-height:46px}
+  .setup-step-name{font-size:10.5px}
+  .setup-step-detail{max-width:150px}
+
+  .new-chat-home{
+    min-height:calc(100dvh - 165px);
+    padding:18px 10px 72px;
+  }
+  .new-chat-home h1{
+    font-size:32px;
+  }
+  .new-chat-home p{
+    font-size:10px;
+  }
+}
+
+/* Brand copy now belongs to setup/about, not each empty chat. */
+
+
+/* =========================================================
+   ATLAS · CHAT-B17
+   ========================================================= */
+
+/* The background click-catcher exists ONLY on phone.
+   On desktop B9/B10/B11 it sat above the sidebar and ate clicks. */
+.mobile-scrim{
+  display:none !important;
+  pointer-events:none !important;
+}
+.sidebar{
+  z-index:80;
+  pointer-events:auto;
+}
+
+/* Atlas sidebar — quieter, closer to the supplied reference. */
+:root{
+  --rail-w:68px;
+  --sidebar-w:360px;
+}
+.rail{
+  width:var(--rail-w);
+}
+.rail-button{
+  width:38px;
+  height:38px;
+}
+.sidebar{
+  left:0;
+  width:var(--sidebar-w);
+  transform:translateX(calc(-1 * var(--sidebar-w) - 8px));
+  border-right:1px solid var(--line);
+}
+.app.sidebar-open .sidebar{
+  transform:translateX(0);
+}
+.sidebar-head{
+  height:72px;
+  flex:0 0 72px;
+  padding:0 20px 0 24px;
+}
+.sidebar-title{
+  font-size:17px;
+  font-weight:520;
+  letter-spacing:-.025em;
+}
+.sidebar-close{
+  width:38px;
+  height:38px;
+  border-radius:11px;
+}
+.sidebar-close svg{
+  width:20px;
+  height:20px;
+}
+.sidebar-new-wrap{
+  padding:14px 15px 8px;
+}
+.sidebar-new{
+  height:42px;
+  border-radius:11px;
+  font-size:11px;
+}
+.sidebar-search-wrap{
+  padding:0 15px 10px;
+}
+.sidebar-search input{
+  height:38px;
+  border-radius:11px;
+  padding-left:31px;
+}
+.sidebar-label{
+  padding:14px 20px 8px;
+  font-size:15px;
+  color:var(--text);
+  letter-spacing:-.02em;
+}
+.history{
+  padding:0 14px 12px;
+}
+.history-item{
+  min-height:40px;
+  border-radius:11px;
+  padding:8px 32px 8px 10px;
+}
+.sidebar-foot{
+  padding:12px 14px max(14px,env(safe-area-inset-bottom));
+}
+.side-action{
+  min-height:40px;
+  border-radius:11px;
+  font-size:11px;
+  padding:0 10px;
+}
+
+/* Pill composer. */
+.composer-wrap{
+  left:var(--rail-w);
+}
+.composer{
+  width:min(620px,calc(100vw - var(--rail-w) - 40px));
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 9px 8px 22px;
+  border-radius:999px;
+  corner-shape:squircle;
+  transition:
+    width .2s ease,
+    border-radius .2s ease,
+    min-height .2s ease,
+    box-shadow .15s ease;
+}
+.composer.multiline{
+  border-radius:29px;
+}
+.composer.expanded{
+  width:min(700px,calc(100vw - var(--rail-w) - 40px));
+  border-radius:26px;
+  align-items:flex-end;
+  padding-top:14px;
+  padding-bottom:10px;
+}
+textarea{
+  min-height:24px;
+  height:24px;
+  max-height:none;
+  padding:0;
+  margin:0;
+  align-self:center;
+  overflow-y:hidden;
+  font-size:14px;
+  line-height:22px;
+}
+.composer.multiline textarea,
+.composer.expanded textarea{
+  align-self:flex-end;
+}
+.composer-controls{
+  flex:0 0 42px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  align-self:stretch;
+}
+.composer.has-overflow .composer-controls,
+.composer.expanded .composer-controls{
+  justify-content:flex-end;
+}
+.composer-expand{
+  display:none;
+  width:32px;
+  height:32px;
+  border:0;
+  padding:0;
+  background:var(--surface-2);
+  color:var(--muted);
+  border-radius:50%;
+  place-items:center;
+  cursor:pointer;
+}
+.composer-expand.show{
+  display:grid;
+}
+.composer-expand:hover{
+  color:var(--text);
+}
+.composer-expand svg{
+  width:14px;
+  height:14px;
+  stroke:currentColor;
+  fill:none;
+  stroke-width:1.55;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.send{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+}
+.edit-cancel{
+  align-self:center;
+}
+
+/* Cached launches should feel like opening an app, not reinstalling one. */
+.loader{
+  min-width:220px;
+}
+
+/* Better setup naming. */
+.setup-overline{
+  text-transform:none;
+  letter-spacing:.02em;
+}
+.setup-step-name{
+  font-size:10.5px;
+}
+
+/* Phone drawer + composer */
+@media(max-width:760px){
+  :root{
+    --rail-w:0px;
+    --sidebar-w:min(88vw,340px);
+  }
+
+  .mobile-scrim{
+    display:block !important;
+    position:fixed;
+    inset:0;
+    z-index:69;
+    border:0;
+    padding:0;
+    background:rgba(0,0,0,.38);
+    opacity:0;
+    pointer-events:none !important;
+    transition:opacity .18s ease;
+  }
+  .app.sidebar-open .mobile-scrim{
+    opacity:1;
+    pointer-events:auto !important;
+  }
+
+  .rail{
+    width:0;
+  }
+  .sidebar{
+    z-index:80;
+    left:0;
+    width:var(--sidebar-w);
+    transform:translateX(calc(-100% - 14px));
+  }
+  .app.sidebar-open .sidebar{
+    transform:translateX(0);
+  }
+
+  .sidebar-head{
+    height:max(66px,calc(52px + env(safe-area-inset-top)));
+    flex-basis:max(66px,calc(52px + env(safe-area-inset-top)));
+    padding:env(safe-area-inset-top) 16px 0 20px;
+  }
+  .sidebar-title{
+    font-size:18px;
+  }
+
+  .composer-wrap{
+    left:0;
+    padding:0 10px;
+  }
+  .composer{
+    width:100%;
+    min-height:58px;
+    border-radius:999px;
+    padding:8px 8px 8px 19px;
+  }
+  .composer.multiline{
+    border-radius:28px;
+  }
+  .composer.expanded{
+    width:100%;
+    border-radius:25px;
+  }
+  textarea{
+    font-size:14px;
+  }
+  .send{
+    width:42px;
+    height:42px;
+    flex-basis:42px;
+  }
+  .composer-controls{
+    flex-basis:42px;
+  }
+
+  .loader{
+    left:50%;
+    width:min(82vw,330px);
+    transform:translateX(-50%);
+  }
+}
+
+
+/* =========================================================
+   ATLAS B13 — user message polish
+   ========================================================= */
+.message{
+  display:flex;
+  flex-direction:column;
+}
+.message.user{
+  align-items:flex-end;
+  padding-top:20px;
+  padding-bottom:20px;
+}
+.message.assistant{
+  align-items:flex-start;
+}
+.message.user .message-shell{
+  max-width:min(72%,780px);
+  background:linear-gradient(90deg,#2d2d2f 0%, #323234 100%);
+  border-radius:20px;
+  corner-shape:squircle;
+  padding:14px 18px;
+  box-shadow:0 1px 0 rgba(255,255,255,.02) inset;
+}
+.message.user .message-text{
+  color:#f1f1ee;
+  font-size:12.9px;
+  line-height:1.44;
+  letter-spacing:-.01em;
+}
+.message.user .message-actions{
+  align-self:flex-end;
+  width:max-content;
+  min-height:0;
+  margin-top:8px;
+  margin-right:6px;
+  gap:8px;
+  opacity:0;
+  pointer-events:none;
+  transform:translateY(-1px);
+}
+.message.user:hover .message-actions,
+.message.user:focus-within .message-actions{
+  opacity:1;
+  pointer-events:auto;
+  transform:none;
+}
+.message.user .message-action{
+  width:22px;
+  height:22px;
+  color:rgba(255,255,255,.42);
+  border-radius:0;
+}
+.message.user .message-action:hover{
+  background:transparent;
+  color:rgba(255,255,255,.82);
+}
+.message.user .message-action svg{
+  width:16px;
+  height:16px;
+}
+@media(max-width:760px){
+  .message.user .message-shell{
+    max-width:calc(100% - 18px);
+    padding:13px 16px;
+    border-radius:18px;
+  }
+  .message.user .message-text{
+    font-size:12.6px;
+    line-height:1.42;
+  }
+  .message.user .message-actions{
+    margin-top:7px;
+    margin-right:4px;
+    gap:10px;
+  }
+}
+
+</style>
+<link rel="manifest" href="./manifest.webmanifest" />
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Atlas" />
+<link rel="icon" type="image/png" sizes="124x119" href="./icons/WebLogoICON.png" />
+<link rel="apple-touch-icon" sizes="496x496" href="./icons/AtlasChat Mobile.png" />
+</head>
+<body data-atlas-build="B12" data-atlas-runtime="v1" data-atlas-schema="v1">
+<div class="app" id="app">
+  <aside class="rail">
+    <button class="rail-button" id="railToggle" aria-label="Open sidebar" title="Chats">
+      <svg viewBox="0 0 24 24">
+        <rect x="3.75" y="3.75" width="16.5" height="16.5" rx="2.7"/>
+        <path d="M9 4v16"/>
+      </svg>
+    </button>
+    <div class="rail-spacer"></div>
+    <div class="rail-status busy visible" id="railStatus" title="Atlas status"></div>
+  </aside>
+
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-title">Atlas</div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">
+        <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
+
+    <div class="sidebar-new-wrap">
+      <button class="sidebar-new" id="newChat">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span>New chat</span>
+      </button>
+    </div>
+
+
+    <div class="sidebar-search-wrap">
+      <div class="sidebar-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+        <input id="chatSearch" type="search" placeholder="Search chats" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="sidebar-label">Recent</div>
+    <div class="history" id="chatHistory"></div>
+
+    <div class="sidebar-foot">
+      <button class="side-action" id="memoryBtn">
+        <svg viewBox="0 0 24 24"><path d="M7 6.75h10A2.25 2.25 0 0 1 19.25 9v6A2.25 2.25 0 0 1 17 17.25H9.5L5.75 20v-11A2.25 2.25 0 0 1 8 6.75"/></svg>
+        <span>Memory</span>
+      </button>
+      <button class="side-action" id="themeBtn">
+        <svg id="themeIcon" viewBox="0 0 24 24"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
+        <span>Appearance</span>
+      </button>
+      <button class="side-action" id="installBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 18.5h14"/></svg>
+        <span>Install Atlas</span>
+        <span class="install-badge" id="installedBadge">Installed</span>
+      </button>
+      <button class="side-action" id="dataBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m8 8 4-4 4 4"/><path d="M5 19.5h14"/></svg>
+        <span>Data</span>
+      </button>
+      <button class="side-action" id="infoBtn">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.25"/><path d="M12 10.75v5M12 8.05h.01"/></svg>
+        <span>About</span>
+      </button>
+    </div>
+  </aside>
+
+  <button class="mobile-scrim" id="mobileScrim" aria-label="Close sidebar"></button>
+
+  <main class="main">
+    <section class="chat" id="chat">
+      <div class="thread" id="thread"></div>
+    </section>
+
+    <div class="loader" id="loader">
+      <div class="loader-line">
+        <span class="loader-title" id="loaderTitle">Preparing Atlas</span>
+        <span class="loader-amount" id="loaderAmount">Starting…</span>
+      </div>
+      <div class="loader-track indeterminate" id="loaderTrack"><div class="loader-bar" id="loaderBar"></div></div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer" id="composer">
+        <button class="edit-cancel" id="editCancel" aria-label="Cancel editing" title="Cancel edit">
+          <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
+        </button>
+        <textarea id="input" rows="1" placeholder="Message Atlas" autocomplete="off"></textarea>
+        <div class="composer-controls">
+          <button class="composer-expand" id="composerExpand" aria-label="Expand message" title="Expand">
+            <svg viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg>
+          </button>
+          <button class="send" id="send" aria-label="Send">
+            <svg viewBox="0 0 24 24"><path d="M12 18.5v-13M6.75 10.75 12 5.5l5.25 5.25"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+
+<div class="setup-overlay" id="setupOverlay" aria-live="polite">
+  <div class="setup-content">
+    <div class="setup-overline">Atlas · Apex 7.3 · Quality Runtime v1</div>
+    <h1>Keep it off the cloud.</h1>
+    <div class="setup-tagline">Meet the alternative.</div>
+    <p class="setup-copy">Atlas is preparing Apex 7.3 for this device. Once stored locally, normal Atlas updates reuse the same model.</p>
+
+    <div class="setup-progress-track">
+      <div class="setup-progress-bar" id="setupProgressBar"></div>
+    </div>
+
+    <div class="setup-steps">
+      <div class="setup-step done" id="setupApp">
+        <span class="setup-step-dot">✓</span>
+        <span class="setup-step-name">App</span>
+        <span class="setup-step-detail">Ready</span>
+      </div>
+      <div class="setup-step active" id="setupRuntime">
+        <span class="setup-step-dot"></span>
+        <span class="setup-step-name">Runtime</span>
+        <span class="setup-step-detail" id="setupRuntimeDetail">Starting…</span>
+      </div>
+      <div class="setup-step" id="setupModel">
+        <span class="setup-step-dot"></span>
+        <span class="setup-step-name">Model</span>
+        <span class="setup-step-detail" id="setupModelDetail">Checking local cache</span>
+      </div>
+      <div class="setup-step" id="setupVerify">
+        <span class="setup-step-dot"></span>
+        <span class="setup-step-name">Verification</span>
+        <span class="setup-step-detail" id="setupVerifyDetail">Waiting</span>
+      </div>
+    </div>
+
+    <div class="setup-foot" id="setupFoot">Quality Runtime downloads the stronger Apex 7.3 model once, then reuses it.</div>
+  </div>
+</div>
+
+<div class="update-banner" id="updateBanner">
+  <span>A new Atlas build is ready.</span>
+  <button id="updateNow">Update</button>
+</div>
+
+<div class="scrim" id="memoryModal">
+  <section class="panel">
+    <div class="panel-head"><h2>Memory</h2><button class="panel-close" data-close="memoryModal">×</button></div>
+    <div class="memory-tabs">
+      <button class="memory-tab active" data-memory-tab="global">Atlas memory</button>
+      <button class="memory-tab" data-memory-tab="chat">This chat</button>
+    </div>
+    <div class="memory-list" id="memoryList"></div>
+    <div class="panel-foot"><button class="text-btn" id="clearMemory">Clear shown memory</button></div>
+  </section>
+</div>
+
+<div class="scrim" id="infoModal">
+  <section class="panel">
+    <div class="panel-head"><h2>Atlas</h2><button class="panel-close" data-close="infoModal">×</button></div>
+    <dl class="info-grid">
+      <div class="info-row"><dt>App</dt><dd>Atlas · CHAT-B17</dd></div>
+      <div class="info-row"><dt>Model</dt><dd>Apex 7.3</dd></div>
+      <div class="info-row"><dt>Runtime</dt><dd>WebLLM Quality Runtime v1 · reused across normal Atlas builds</dd></div>
+      <div class="info-row"><dt>Data</dt><dd>Schema v1 · chats and memory persist independently of the app build</dd></div>
+      <div class="info-row"><dt>Role</dt><dd>General-purpose local AI — conversation, ideas, writing, explanations, projects, and coding when relevant</dd></div>
+      <div class="info-row"><dt>Language foundation</dt><dd>Primary: HuggingFaceTB SmolLM2-1.7B-Instruct · fallback: SmolLM2-360M-Instruct</dd></div>
+      <div class="info-row"><dt>Memory</dt><dd>Per-chat context plus persistent Atlas memory stored in Data Schema v1</dd></div>
+      <div class="info-row"><dt>Context</dt><dd>Only the active chat's recent messages are sent as conversation context</dd></div>
+      <div class="info-row"><dt>Inference</dt><dd>WebLLM / MLC · WebGPU-native inference · quality-first model selection</dd></div>
+      <div class="info-row"><dt>Stability</dt><dd>Startup coherence verification, validated responses, and clean local runtime recovery</dd></div>
+      <div class="info-row"><dt>Privacy</dt><dd>Messages are not sent to an inference API</dd></div>
+    </dl>
+  </section>
+</div>
+
+
+<div class="scrim" id="installModal">
+  <section class="panel">
+    <div class="panel-head"><h2>Install Atlas</h2><button class="panel-close" data-close="installModal">×</button></div>
+    <div class="install-copy" id="installCopy">
+      <strong>Atlas can live on your home screen like an app.</strong><br><br>
+      Once this site is hosted over HTTPS, open it in Chrome and install it. The app shell is cached for offline launches; the AI model is still downloaded and cached by the browser on first use.
+    </div>
+    <div class="panel-foot"><button class="text-btn" id="installAction">Install</button></div>
+  </section>
+</div>
+
+<div class="scrim" id="dataModal">
+  <section class="panel">
+    <div class="panel-head"><h2>Atlas data</h2><button class="panel-close" data-close="dataModal">×</button></div>
+    <div class="data-actions">
+      <button class="data-button" id="exportData">
+        <strong>Export Atlas backup</strong>
+        <span>Chats, global memory, chat memory, and appearance.</span>
+      </button>
+      <button class="data-button" id="importData">
+        <strong>Import Atlas backup</strong>
+        <span>Restore an Atlas backup from another device.</span>
+      </button>
+    </div>
+    <div class="storage-status" id="storageStatus">Checking local storage…</div>
+  </section>
+</div>
+
+<input id="importFile" type="file" accept=".atlasbackup,.apexbackup,application/json" hidden />
+<div class="toast" id="toast"></div>
+<div class="mini-toast" id="miniToast"></div>
+
+<script>
+(() => {
+  const BUILD = "Atlas-CHAT-B17";
+  const $ = q => document.querySelector(q);
+
+  function verifyRequiredUI(){
+    const required=[
+      "app","thread","chat","input","send","composerExpand","chatHistory","railStatus",
+      "loader","memoryModal","infoModal","composer","chatSearch",
+      "mobileScrim","setupOverlay","updateBanner"
+    ];
+    const missing=required.filter(id=>!document.getElementById(id));
+    if(missing.length){
+      console.error("Atlas UI is missing required elements:",missing);
+      return false;
+    }
+    return true;
+  }
+
+  const uiStructureOK=verifyRequiredUI();
+
+  const app = $("#app");
+  const thread = $("#thread");
+  const chat = $("#chat");
+  const input = $("#input");
+  const send = $("#send");
+  const historyEl = $("#chatHistory");
+  const railStatus = $("#railStatus");
+  const loader = $("#loader");
+  const loaderTitle = $("#loaderTitle");
+  const loaderAmount = $("#loaderAmount");
+  const loaderTrack = $("#loaderTrack");
+  const loaderBar = $("#loaderBar");
+  const memoryModal = $("#memoryModal");
+  const infoModal = $("#infoModal");
+  const memoryList = $("#memoryList");
+  const composer = $("#composer");
+  const editCancel = $("#editCancel");
+  const composerExpand = $("#composerExpand");
+  const chatSearch = $("#chatSearch");
+  const miniToast = $("#miniToast");
+  const mobileScrim = $("#mobileScrim");
+  const setupOverlay = $("#setupOverlay");
+  const setupProgressBar = $("#setupProgressBar");
+  const setupRuntime = $("#setupRuntime");
+  const setupRuntimeDetail = $("#setupRuntimeDetail");
+  const setupModel = $("#setupModel");
+  const setupModelDetail = $("#setupModelDetail");
+  const setupVerify = $("#setupVerify");
+  const setupVerifyDetail = $("#setupVerifyDetail");
+  const setupFoot = $("#setupFoot");
+  const updateBanner = $("#updateBanner");
+  const updateNow = $("#updateNow");
+  const installModal = $("#installModal");
+  const dataModal = $("#dataModal");
+  const installBtn = $("#installBtn");
+  const installAction = $("#installAction");
+  const installedBadge = $("#installedBadge");
+  const installCopy = $("#installCopy");
+  const importFile = $("#importFile");
+  const storageStatus = $("#storageStatus");
+  const toast = $("#toast");
+
+  const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2);
+
+  const DATA_SCHEMA = 1;
+  const RUNTIME_ID = "atlas-webllm-quality-v1";
+  const CHAT_STORE_KEY = "apex.chats.v1";
+  const MEMORY_STORE_KEY = "apex.memory.v1";
+  const SETTINGS_STORE_KEY = "apex.settings.v1";
+  const MIGRATION_KEY = "apex.migration.v1";
+  const RUNTIME_READY_KEY = "atlas.webllm.quality.v1.ready";
+
+  function readJSON(key,fallback=null){
+    try{
+      const raw=localStorage.getItem(key);
+      return raw==null?fallback:JSON.parse(raw);
+    }catch{
+      return fallback;
+    }
+  }
+
+  function blankChat(){
+    const now=Date.now();
+    return {
+      id:uid(),
+      title:"",
+      titleState:"empty",
+      created:now,
+      updated:now,
+      messages:[],
+      memory:[]
+    };
+  }
+
+  function normalizeChat(c){
+    return {
+      id:c?.id||uid(),
+      title:typeof c?.title==="string"?c.title:"",
+      titleState:c?.titleState||((c?.title&&c.title!=="New chat")?"ready":"empty"),
+      created:c?.created||Date.now(),
+      updated:c?.updated||Date.now(),
+      messages:Array.isArray(c?.messages)?c.messages:[],
+      memory:Array.isArray(c?.memory)?c.memory:[]
+    };
+  }
+
+  function legacyChatScore(chats){
+    if(!Array.isArray(chats))return -1;
+    return chats.reduce((n,c)=>n+(Array.isArray(c?.messages)?c.messages.length:0),0);
+  }
+
+  function migratePersistentData(){
+    let migrationSource="";
+    let migrationCount=0;
+
+    let chatStore=readJSON(CHAT_STORE_KEY,null);
+    if(!chatStore || chatStore.schema!==DATA_SCHEMA || !Array.isArray(chatStore.chats)){
+      const legacyCandidates=[
+        ["B9","apex72.chatB9.chats","apex72.chatB9.active"],
+        ["B8","apex72.chatB8.chats","apex72.chatB8.active"],
+        ["B7","apex72.chatB7.chats","apex72.chatB7.active"]
+      ];
+
+      let best=null;
+      for(const [build,chatsKey,activeKey] of legacyCandidates){
+        const candidate=readJSON(chatsKey,null);
+        if(!Array.isArray(candidate))continue;
+        const score=legacyChatScore(candidate);
+        if(!best || score>best.score){
+          best={
+            build,
+            chats:candidate,
+            active:localStorage.getItem(activeKey)||null,
+            score
+          };
+        }
+      }
+
+      const migratedChats=(best?.chats||[]).map(normalizeChat);
+      const chats=migratedChats.length?migratedChats:[blankChat()];
+      const active=best?.active&&chats.some(c=>c.id===best.active)?best.active:chats[0].id;
+
+      chatStore={
+        schema:DATA_SCHEMA,
+        chats,
+        activeChatId:active,
+        migratedFrom:best?.build||null
+      };
+
+      localStorage.setItem(CHAT_STORE_KEY,JSON.stringify(chatStore));
+
+      if(best){
+        migrationSource=best.build;
+        migrationCount=best.chats.filter(c=>Array.isArray(c?.messages)&&c.messages.length).length;
+      }
+    }
+
+    let memoryStore=readJSON(MEMORY_STORE_KEY,null);
+    if(!memoryStore || memoryStore.schema!==DATA_SCHEMA || !Array.isArray(memoryStore.items)){
+      const oldMemory=readJSON("apex72.memories",[]);
+      memoryStore={
+        schema:DATA_SCHEMA,
+        items:Array.isArray(oldMemory)?oldMemory:[]
+      };
+      localStorage.setItem(MEMORY_STORE_KEY,JSON.stringify(memoryStore));
+    }
+
+    let settingsStore=readJSON(SETTINGS_STORE_KEY,null);
+    if(!settingsStore || settingsStore.schema!==DATA_SCHEMA){
+      const oldTheme=localStorage.getItem("apex72.theme");
+      settingsStore={
+        schema:DATA_SCHEMA,
+        theme:(oldTheme==="light"||oldTheme==="dark")?oldTheme:null
+      };
+      localStorage.setItem(SETTINGS_STORE_KEY,JSON.stringify(settingsStore));
+    }
+
+    // WebLLM Quality Runtime v1 is independent from CHAT-Bxx. Carry forward any successful
+    // load marker from builds that already used the exact same official model.
+    if(localStorage.getItem(RUNTIME_READY_KEY)!=="1"){
+      const sameRuntimeMarkers=[
+        "legacy.onnx.marker.disabled",
+        "legacy.onnx.marker.disabled",
+        "legacy.onnx.marker.disabled",
+        "legacy.onnx.marker.disabled",
+        "legacy.onnx.marker.disabled"
+      ];
+      if(sameRuntimeMarkers.some(key=>localStorage.getItem(key)==="1")){
+        localStorage.setItem(RUNTIME_READY_KEY,"1");
+      }
+    }
+
+    const migration={
+      schema:DATA_SCHEMA,
+      completed:true,
+      source:migrationSource||null,
+      count:migrationCount,
+      at:new Date().toISOString()
+    };
+    localStorage.setItem(MIGRATION_KEY,JSON.stringify(migration));
+
+    return {chatStore,memoryStore,settingsStore,migration};
+  }
+
+  const bootData=migratePersistentData();
+
+  const state={
+    chats:bootData.chatStore.chats.map(normalizeChat),
+    activeChatId:bootData.chatStore.activeChatId,
+    globalMemory:bootData.memoryStore.items,
+    theme:bootData.settingsStore.theme,
+    memoryTab:"global",
+    loaded:false,loading:false,generating:false,titleGenerating:false,
+    backend:null,pendingId:null,pendingEl:null,pendingChatId:null,pendingText:"",queued:false,hasToken:false,
+    tokenPauseTimer:null,titleJobId:null,titleChatId:null,
+    files:Object.create(null),progress:0,lastLoadedBytes:0,lastTotalBytes:0,
+    installPrompt:null,
+    standalone:window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
+    editingMessageId:null,
+    searchQuery:"",
+    runtimeKnown:localStorage.getItem(RUNTIME_READY_KEY)==="1",
+    firstSetup:false,
+    swRegistration:null,
+    reloadingForUpdate:false,
+    migration:bootData.migration
+  };
+
+  if(!state.chats.length){
+    const c=blankChat();
+    state.chats=[c];
+    state.activeChatId=c.id;
+  }
+  if(!state.chats.some(c=>c.id===state.activeChatId)){
+    state.activeChatId=state.chats[0].id;
+  }
+
+  const activeChat=()=>state.chats.find(c=>c.id===state.activeChatId)||state.chats[0];
+
+  function persist(){
+    localStorage.setItem(CHAT_STORE_KEY,JSON.stringify({
+      schema:DATA_SCHEMA,
+      chats:state.chats,
+      activeChatId:state.activeChatId
+    }));
+  }
+
+  function persistMemory(){
+    localStorage.setItem(MEMORY_STORE_KEY,JSON.stringify({
+      schema:DATA_SCHEMA,
+      items:state.globalMemory
+    }));
+  }
+
+  function persistSettings(){
+    localStorage.setItem(SETTINGS_STORE_KEY,JSON.stringify({
+      schema:DATA_SCHEMA,
+      theme:state.theme
+    }));
+  }
+
+  function setTheme(theme){
+    document.documentElement.dataset.theme=theme;
+    state.theme=theme;
+    persistSettings();
+    $("#themeIcon").innerHTML=theme==="dark"
+      ? '<path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/>'
+      : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  }
+  setTheme(state.theme||(matchMedia("(prefers-color-scheme:light)").matches?"light":"dark"));
+
+  const preferredBackend="webgpu";
+
+  class AtlasWebLLMAdapter {
+    constructor(){
+      this.onmessage=null;
+      this.listeners={error:[],messageerror:[]};
+      this.engine=null;
+      this.engineWorker=null;
+      this.webllm=null;
+      this.loadingPromise=null;
+      this.modelId=null;
+      this.variant=null;
+    }
+
+    addEventListener(type,fn){
+      if(this.listeners[type])this.listeners[type].push(fn);
+    }
+
+    _dispatch(type,event){
+      for(const fn of this.listeners[type]||[]){
+        try{fn(event)}catch{}
+      }
+    }
+
+    _emit(data){
+      queueMicrotask(()=>this.onmessage?.({data}));
+    }
+
+    postMessage(message){
+      if(message?.type==="load"){
+        this._load();
+        return;
+      }
+
+      if(message?.type==="generate"){
+        this._generate(message);
+        return;
+      }
+
+      if(message?.type==="dispose"){
+        this._dispose();
+      }
+    }
+
+    async _importWebLLM(){
+      if(this.webllm)return this.webllm;
+      this.webllm=await import("https://esm.run/@mlc-ai/web-llm@0.2.85");
+      return this.webllm;
+    }
+
+    async _pickModels(){
+      if(!("gpu" in navigator)){
+        throw new Error("WebGPU is not available in this browser.");
+      }
+
+      const adapter=await navigator.gpu.requestAdapter({powerPreference:"high-performance"});
+      if(!adapter){
+        throw new Error("WebGPU is available, but Chrome could not access a compatible GPU.");
+      }
+
+      const hasF16=adapter.features?.has?.("shader-f16");
+
+      // Apex 7.3 Quality profile:
+      // 1.7B first for instruction-following and code quality.
+      // 360M remains a compatibility fallback, not the default brain.
+      return hasF16
+        ? [
+            {
+              id:"SmolLM2-1.7B-Instruct-q4f16_1-MLC",
+              label:"Apex 7.3 · 1.7B · q4f16",
+              tier:"quality"
+            },
+            {
+              id:"SmolLM2-360M-Instruct-q4f16_1-MLC",
+              label:"Apex 7.3 · 360M fallback · q4f16",
+              tier:"fallback"
+            },
+            {
+              id:"SmolLM2-360M-Instruct-q4f32_1-MLC",
+              label:"Apex 7.3 · 360M fallback · q4f32",
+              tier:"fallback"
+            }
+          ]
+        : [
+            {
+              id:"SmolLM2-1.7B-Instruct-q4f32_1-MLC",
+              label:"Apex 7.3 · 1.7B · q4f32",
+              tier:"quality"
+            },
+            {
+              id:"SmolLM2-360M-Instruct-q4f32_1-MLC",
+              label:"Apex 7.3 · 360M fallback · q4f32",
+              tier:"fallback"
+            }
+          ];
+    }
+
+    _progressToInfo(report){
+      const p=Number(report?.progress);
+      const progress=Number.isFinite(p)?Math.max(0,Math.min(1,p)):0;
+
+      return {
+        status:progress>=1?"done":"progress",
+        file:"webllm-model",
+        loaded:Math.round(progress*1000000),
+        total:1000000,
+        progress:progress*100,
+        text:String(report?.text||"")
+      };
+    }
+
+    async _createEngine(model){
+      const webllm=await this._importWebLLM();
+
+      if(this.engineWorker){
+        try{this.engineWorker.terminate()}catch{}
+      }
+
+      const engineWorker=new Worker("./atlas-mlc-worker.js",{type:"module"});
+      this.engineWorker=engineWorker;
+
+      engineWorker.addEventListener("error",event=>{
+        this._dispatch("error",event);
+      });
+
+      engineWorker.addEventListener("messageerror",event=>{
+        this._dispatch("messageerror",event);
+      });
+
+      const appConfig={
+        ...webllm.prebuiltAppConfig,
+        cacheBackend:"cache"
+      };
+
+      return await webllm.CreateWebWorkerMLCEngine(
+        engineWorker,
+        model.id,
+        {
+          appConfig,
+          initProgressCallback:(report)=>{
+            this._emit({
+              type:"progress",
+              info:this._progressToInfo(report)
+            });
+          }
+        }
+      );
+    }
+
+    async _load(){
+      if(this.engine){
+        this._emit({
+          type:"loaded",
+          backend:"webgpu",
+          modelId:this.modelId,
+          variant:this.variant,
+          verified:true
+        });
+        return;
+      }
+
+      if(this.loadingPromise)return this.loadingPromise;
+
+      this.loadingPromise=(async()=>{
+        this._emit({
+          type:"load-phase",
+          backend:"webgpu"
+        });
+
+        this._emit({
+          type:"progress",
+          info:{
+            status:"initiate",
+            file:"webllm-model",
+            loaded:0,
+            total:1000000
+          }
+        });
+
+        const models=await this._pickModels();
+        let lastError=null;
+
+        for(const model of models){
+          try{
+            const engine=await this._createEngine(model);
+
+            this._emit({
+              type:"verify-phase",
+              backend:"webgpu"
+            });
+
+            const check=await engine.chat.completions.create({
+              messages:[
+                {role:"system",content:"Reply briefly and normally."},
+                {role:"user",content:"Say hello."}
+              ],
+              temperature:0,
+              top_p:0.9,
+              repetition_penalty:1.08,
+              max_tokens:12
+            });
+
+            const text=String(check?.choices?.[0]?.message?.content||"").trim();
+            if(!text){
+              throw new Error("WebLLM loaded but produced an empty verification response.");
+            }
+
+            this.engine=engine;
+            this.modelId=model.id;
+            this.variant=model.label;
+            this.modelTier=model.tier||"unknown";
+
+            localStorage.setItem("atlas.webllm.model",model.id);
+            localStorage.setItem("atlas.webllm.tier",this.modelTier);
+
+            this._emit({
+              type:"loaded",
+              backend:"webgpu",
+              modelId:model.id,
+              variant:model.label,
+              tier:this.modelTier,
+              verified:true
+            });
+
+            return;
+          }catch(error){
+            lastError=error;
+
+            this._emit({
+              type:"backend-failed",
+              backend:"webgpu",
+              message:String(error?.message||error)
+            });
+
+            try{this.engineWorker?.terminate()}catch{}
+            this.engineWorker=null;
+            this.engine=null;
+          }
+        }
+
+        throw lastError||new Error("Atlas could not initialize WebLLM.");
+      })();
+
+      try{
+        return await this.loadingPromise;
+      }catch(error){
+        this._emit({
+          type:"error",
+          id:null,
+          message:String(error?.message||error)
+        });
+      }finally{
+        this.loadingPromise=null;
+      }
+    }
+
+    async _generate(message){
+      try{
+        await this._load();
+        if(!this.engine)throw new Error("WebLLM is not loaded.");
+
+        const maxTokens=Math.max(24,Math.min(260,Number(message.maxNewTokens||140)));
+
+        const stream=await this.engine.chat.completions.create({
+          messages:message.messages,
+          temperature:0.18,
+          top_p:0.86,
+          frequency_penalty:0.35,
+          presence_penalty:0.05,
+          repetition_penalty:1.12,
+          max_tokens:maxTokens,
+          stream:true,
+          stream_options:{include_usage:true}
+        });
+
+        let full="";
+        let interruptedForLoop=false;
+
+        const looksLooping=(text)=>{
+          const clean=String(text||"").replace(/\s+/g," ").trim().toLowerCase();
+          if(clean.length<140)return false;
+
+          // Catch repeated sentence-sized suffixes.
+          for(const size of [36,48,64,80]){
+            if(clean.length<size*3)continue;
+            const a=clean.slice(-size);
+            const b=clean.slice(-(size*2),-size);
+            const c=clean.slice(-(size*3),-(size*2));
+            if(a===b && b===c)return true;
+          }
+
+          // Catch repeated clauses such as "I'm learning how to..." loops.
+          const clauses=clean.split(/[.!?]\s+|,\s+/).map(s=>s.trim()).filter(s=>s.length>22);
+          if(clauses.length>=5){
+            const last=clauses[clauses.length-1];
+            const matches=clauses.filter(x=>x===last).length;
+            if(matches>=3)return true;
+          }
+
+          return false;
+        };
+
+        for await (const chunk of stream){
+          const token=chunk?.choices?.[0]?.delta?.content||"";
+          if(token){
+            full+=token;
+
+            this._emit({
+              type:"token",
+              id:message.id,
+              text:token
+            });
+
+            if(looksLooping(full)){
+              interruptedForLoop=true;
+              try{this.engine.interruptGenerate()}catch{}
+              break;
+            }
+          }
+        }
+
+        if(interruptedForLoop){
+          full=full.replace(/(\b[^.!?]{24,}[.!?]\s*)(?:\1){2,}$/i,"$1").trim();
+        }
+
+        full=String(full||"").trim();
+
+        if(!full){
+          try{
+            full=String(await this.engine.getMessage()||"").trim();
+          }catch{}
+        }
+
+        if(!full){
+          throw new Error("Apex returned an empty response.");
+        }
+
+        this._emit({
+          type:"done",
+          id:message.id,
+          text:full,
+          backend:"webgpu",
+          modelId:this.modelId,
+          variant:this.variant,
+          verified:true
+        });
+      }catch(error){
+        this._emit({
+          type:"error",
+          id:message.id,
+          message:String(error?.message||error)
+        });
+      }
+    }
+
+    async _dispose(){
+      try{await this.engine?.unload?.()}catch{}
+      try{this.engineWorker?.terminate()}catch{}
+      this.engine=null;
+      this.engineWorker=null;
+      this.modelId=null;
+      this.variant=null;
+    }
+  }
+
+  const ai=new AtlasWebLLMAdapter();
+  let workerHandshakeTimer=null;
+  let workerHasResponded=false;
+
+  function clearWorkerHandshake(){
+    workerHasResponded=true;
+    clearTimeout(workerHandshakeTimer);
+    workerHandshakeTimer=null;
+  }
+
+  function failWorkerStartup(detail){
+    clearTimeout(workerHandshakeTimer);
+    workerHandshakeTimer=null;
+
+    state.loading=false;
+    state.loaded=false;
+    setRailStatus("error");
+    hideLoader(0);
+
+    if(state.firstSetup){
+      setupOverlay.classList.remove("show");
+    }
+
+    showFriendlyError(detail || "The local Atlas runtime could not start.");
+  }
+
+  ai.addEventListener("error",event=>{
+    console.error("Atlas worker error:",event);
+    failWorkerStartup(
+      event?.message
+        ? `Atlas worker failed before startup: ${event.message}`
+        : "Atlas worker failed before startup."
+    );
+  });
+
+  ai.addEventListener("messageerror",event=>{
+    console.error("Atlas worker message error:",event);
+    failWorkerStartup("Atlas could not read a message from its local runtime.");
+  });
+
+  function showToast(text){
+    toast.textContent=text;
+    toast.classList.add("show");
+    clearTimeout(showToast.timer);
+    showToast.timer=setTimeout(()=>toast.classList.remove("show"),1800);
+  }
+
+  function showUpdateAvailable(){
+    updateBanner.classList.add("show");
+  }
+
+  async function registerServiceWorker(){
+    if(!("serviceWorker" in navigator))return;
+
+    try{
+      const reg=await navigator.serviceWorker.register("./sw.js",{scope:"./"});
+      state.swRegistration=reg;
+
+      if(reg.waiting && navigator.serviceWorker.controller){
+        showUpdateAvailable();
+      }
+
+      reg.addEventListener("updatefound",()=>{
+        const installing=reg.installing;
+        if(!installing)return;
+
+        installing.addEventListener("statechange",()=>{
+          if(installing.state==="installed" && navigator.serviceWorker.controller){
+            showUpdateAvailable();
+          }
+        });
+      });
+
+      navigator.serviceWorker.addEventListener("controllerchange",()=>{
+        if(state.reloadingForUpdate)return;
+        state.reloadingForUpdate=true;
+        location.reload();
+      });
+    }catch(error){
+      console.warn("Atlas service worker registration failed:",error);
+    }
+  }
+
+  updateNow.onclick=()=>{
+    const waiting=state.swRegistration?.waiting;
+    if(waiting){
+      waiting.postMessage({type:"SKIP_WAITING"});
+    }else{
+      location.reload();
+    }
+  };
+
+  function refreshInstallUI(){
+    if(state.standalone){
+      installedBadge.classList.add("show");
+      installAction.textContent="Installed";
+      installAction.disabled=true;
+      installCopy.innerHTML="<strong>Atlas is installed.</strong><br><br>It can launch from your home screen in standalone mode.";
+    }else{
+      installedBadge.classList.remove("show");
+      installAction.disabled=false;
+      installAction.textContent=state.installPrompt?"Install":"How to install";
+    }
+  }
+
+  window.addEventListener("beforeinstallprompt",event=>{
+    event.preventDefault();
+    state.installPrompt=event;
+    refreshInstallUI();
+  });
+
+  window.addEventListener("appinstalled",()=>{
+    state.standalone=true;
+    state.installPrompt=null;
+    refreshInstallUI();
+    showToast("Atlas installed");
+  });
+
+  async function installAtlas(){
+    if(state.standalone) return;
+
+    if(state.installPrompt){
+      state.installPrompt.prompt();
+      try{ await state.installPrompt.userChoice; }catch{}
+      state.installPrompt=null;
+      refreshInstallUI();
+      return;
+    }
+
+    installModal.classList.add("show");
+    installCopy.innerHTML=
+      "<strong>On Android Chrome:</strong><br><br>Tap Chrome's ⋮ menu, then choose <b>Install app</b> or <b>Add to Home screen</b>.<br><br>If you are still using localhost, host Atlas first so your phone can open it from anywhere.";
+    installAction.textContent="Got it";
+    installAction.disabled=false;
+    installAction.onclick=()=>installModal.classList.remove("show");
+  }
+
+  async function updateStorageStatus(){
+    let lines=[];
+    const modelSeen=localStorage.getItem(RUNTIME_READY_KEY)==="1";
+    lines.push(`<b>App:</b> ${BUILD}`);
+    lines.push(`<b>Runtime:</b> WebLLM Quality Runtime v1 · ${state.loaded?"loaded now":modelSeen?"previously prepared on this site":"setup required"}`);
+    lines.push(`<b>Engine:</b> WebLLM 0.2.85 · WebGPU`);
+    const webllmModel=localStorage.getItem("atlas.webllm.model");
+    const webllmTier=localStorage.getItem("atlas.webllm.tier");
+    if(webllmModel)lines.push(`<b>Model build:</b> ${webllmModel}`);
+    if(webllmTier)lines.push(`<b>Model tier:</b> ${webllmTier}`);
+    lines.push(`<b>Data:</b> Schema v${DATA_SCHEMA} · persistent across CHAT builds`);
+
+    if(navigator.storage?.estimate){
+      try{
+        const {usage=0,quota=0}=await navigator.storage.estimate();
+        lines.push(`<b>Browser storage:</b> ${humanBytes(usage)} used${quota?` of ${humanBytes(quota)}`:""}`);
+      }catch{}
+    }
+
+    try{
+      if("caches" in window){
+        const names=await caches.keys();
+        let modelRequests=0;
+        for(const name of names){
+          const cache=await caches.open(name);
+          const keys=await cache.keys();
+          modelRequests+=keys.filter(req=>req.url.includes("SmolLM2-360M-Instruct")).length;
+        }
+        if(modelRequests) lines.push(`<b>Model cache:</b> ${modelRequests} cached model resource${modelRequests===1?"":"s"} detected`);
+      }
+    }catch{}
+
+    storageStatus.innerHTML=lines.join("<br>");
+  }
+
+  function makeBackup(){
+    return {
+      format:"AtlasBackup",
+      version:2,
+      dataSchema:DATA_SCHEMA,
+      build:BUILD,
+      runtime:RUNTIME_ID,
+      exportedAt:new Date().toISOString(),
+      chats:state.chats,
+      activeChatId:state.activeChatId,
+      globalMemory:state.globalMemory,
+      settings:{
+        theme:state.theme
+      }
+    };
+  }
+
+  function exportBackup(){
+    const blob=new Blob([JSON.stringify(makeBackup(),null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    const stamp=new Date().toISOString().slice(0,10);
+    a.href=url;
+    a.download=`Atlas-${stamp}.atlasbackup`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast("Atlas backup exported");
+  }
+
+  async function importBackupFile(file){
+    const text=await file.text();
+    const data=JSON.parse(text);
+
+    if(!["AtlasBackup","ApexBackup"].includes(data?.format) || !Array.isArray(data.chats)){
+      throw new Error("That file is not a valid Atlas backup.");
+    }
+
+    state.chats=data.chats.map(normalizeChat);
+    if(!state.chats.length)state.chats=[blankChat()];
+
+    state.activeChatId=data.activeChatId && state.chats.some(c=>c.id===data.activeChatId)
+      ? data.activeChatId
+      : state.chats[0].id;
+
+    state.globalMemory=Array.isArray(data.globalMemory)?data.globalMemory:[];
+
+    const importedTheme=data.settings?.theme || data.theme;
+    if(importedTheme==="dark"||importedTheme==="light"){
+      setTheme(importedTheme);
+    }
+
+    persist();
+    persistMemory();
+    persistSettings();
+
+    renderHistory();
+    renderCurrent();
+    renderMemory();
+    await updateStorageStatus();
+    showToast("Atlas backup restored");
+  }
+
+  registerServiceWorker();
+  refreshInstallUI();
+
+  async function hasCachedApexModel(){
+    if(localStorage.getItem(RUNTIME_READY_KEY)==="1")return true;
+    if(!("caches" in window))return false;
+
+    try{
+      const names=await caches.keys();
+      let sawModel=false;
+      let sawTokenizer=false;
+
+      for(const name of names){
+        const cache=await caches.open(name);
+        const requests=await cache.keys();
+
+        for(const req of requests){
+          const u=decodeURIComponent(req.url);
+          if(!u.includes("SmolLM2-360M-Instruct"))continue;
+
+          if(/model.*q4.*\.onnx|model_q4\.onnx/i.test(u))sawModel=true;
+          if(/tokenizer|tokenizer_config|config\.json/i.test(u))sawTokenizer=true;
+        }
+      }
+
+      if(sawModel){
+        localStorage.setItem(RUNTIME_READY_KEY,"1");
+        return true;
+      }
+
+      return false;
+    }catch(error){
+      console.warn("Atlas cache check failed:",error);
+      return false;
+    }
+  }
+
+  async function requestPersistentStorage(){
+    try{
+      if(navigator.storage?.persist){
+        const granted=await navigator.storage.persist();
+        localStorage.setItem("atlas.storage.persistent",granted?"1":"0");
+      }
+    }catch{}
+  }
+
+  async function bootAtlas(){
+    const cached=await hasCachedApexModel();
+    state.runtimeKnown=state.runtimeKnown||cached;
+    state.firstSetup=!state.runtimeKnown;
+
+    if("requestIdleCallback" in window){
+      requestIdleCallback(()=>startPreload(),{timeout:500});
+    }else{
+      setTimeout(startPreload,160);
+    }
+  }
+
+  function setRailStatus(kind){
+    railStatus.className="rail-status visible "+kind;
+  }
+
+  function setSetupStep(el,status,detailEl=null,detail=""){
+    if(!el)return;
+    el.classList.remove("active","done","error");
+    if(status)el.classList.add(status);
+
+    const dot=el.querySelector(".setup-step-dot");
+    if(dot){
+      dot.textContent=status==="done"?"✓":status==="error"?"!":"";
+    }
+
+    if(detailEl && detail)detailEl.textContent=detail;
+  }
+
+  function showFirstSetup(){
+    state.firstSetup=true;
+    setupOverlay.classList.add("show");
+    loader.classList.remove("show");
+    setupProgressBar.style.width="10%";
+    setSetupStep(setupRuntime,"active",setupRuntimeDetail,"Starting local runtime");
+    setSetupStep(setupModel,"",setupModelDetail,"Checking local cache");
+    setSetupStep(setupVerify,"",setupVerifyDetail,"Waiting");
+  }
+
+  function finishSetup(){
+    localStorage.setItem(RUNTIME_READY_KEY,"1");
+    state.runtimeKnown=true;
+    requestPersistentStorage();
+
+    if(state.firstSetup){
+      setSetupStep(setupRuntime,"done",setupRuntimeDetail,"Ready");
+      setSetupStep(setupModel,"done",setupModelDetail,"Stored locally");
+      setSetupStep(setupVerify,"done",setupVerifyDetail,"Verified");
+      setupProgressBar.style.width="100%";
+      setupFoot.textContent="Atlas is ready. Apex 7.3 stays local and is reused by future CHAT builds.";
+      setTimeout(()=>{
+        setupOverlay.classList.remove("show");
+        state.firstSetup=false;
+      },850);
+    }
+  }
+
+  function setupRuntimeStarting(){
+    if(state.firstSetup){
+      setupProgressBar.style.width="24%";
+      setSetupStep(setupRuntime,"active",setupRuntimeDetail,"Starting CPU runtime");
+    }else{
+      showLoader("Opening Atlas","WebLLM Quality Runtime v1 · local",null,true);
+    }
+  }
+
+  function setupModelChecking(){
+    if(state.firstSetup){
+      setupProgressBar.style.width="34%";
+      setSetupStep(setupRuntime,"done",setupRuntimeDetail,"Ready");
+      setSetupStep(setupModel,"active",setupModelDetail,"Apex 7.3 · checking cache");
+    }else{
+      showLoader("Opening Atlas","Checking Apex 7.3 locally",null,true);
+    }
+  }
+
+  function setupModelProgress(loaded,total,percent){
+    const amount=total>0?`${humanBytes(loaded)} / ${humanBytes(total)}`:"Receiving…";
+
+    if(state.firstSetup){
+      const mapped=38+Math.max(0,Math.min(48,(Number(percent)||0)*.48));
+      setupProgressBar.style.width=mapped+"%";
+      setSetupStep(setupRuntime,"done",setupRuntimeDetail,"Ready");
+      setSetupStep(setupModel,"active",setupModelDetail,amount);
+      setupFoot.textContent="Storing Apex 7.3 locally. Future Atlas builds reuse this WebLLM Quality Runtime v1 cache.";
+    }else{
+      showLoader("Opening Atlas","Apex 7.3 · local",percent,false);
+    }
+  }
+
+  function setupVerifying(){
+    if(state.firstSetup){
+      setupProgressBar.style.width="90%";
+      setSetupStep(setupRuntime,"done",setupRuntimeDetail,"Ready");
+      setSetupStep(setupModel,"done",setupModelDetail,"Local");
+      setSetupStep(setupVerify,"active",setupVerifyDetail,"Checking coherence");
+    }else{
+      showLoader("Verifying Apex 7.3","CPU · local",null,true);
+    }
+  }
+
+  function setupFailed(detail){
+    if(state.firstSetup){
+      setupProgressBar.style.width="100%";
+      setSetupStep(setupVerify,"error",setupVerifyDetail,"Couldn't finish");
+      setupFoot.textContent="Atlas couldn't finish local setup. Technical details are available in the chat error.";
+    }else{
+      showLoader("Atlas couldn't start","Error",state.progress,false);
+    }
+  }
+
+  function humanBytes(bytes){
+    if(!Number.isFinite(bytes))return "";
+    if(bytes>=1073741824)return(bytes/1073741824).toFixed(2)+" GB";
+    if(bytes>=1048576)return(bytes/1048576).toFixed(0)+" MB";
+    if(bytes>=1024)return(bytes/1024).toFixed(0)+" KB";
+    return bytes+" B";
+  }
+
+  function showLoader(title,amount="",percent=null,indeterminate=false){
+    loader.classList.add("show");
+    loaderTitle.textContent=title;
+    loaderAmount.textContent=amount;
+    loaderTrack.classList.toggle("indeterminate",indeterminate);
+    if(!indeterminate&&Number.isFinite(percent))loaderBar.style.width=Math.max(0,Math.min(100,percent))+"%";
+  }
+  function hideLoader(delay=0){
+    clearTimeout(hideLoader.timer);
+    hideLoader.timer=setTimeout(()=>loader.classList.remove("show"),delay);
+  }
+
+  function aggregate(info){
+    const key=String(info.file||"unknown");
+    const e=state.files[key]||{loaded:0,total:0};
+    if(Number.isFinite(info.loaded))e.loaded=Math.max(e.loaded,Number(info.loaded));
+    if(Number.isFinite(info.total)&&info.total>0)e.total=Math.max(e.total,Number(info.total));
+    if(info.status==="done"&&e.total>0)e.loaded=e.total;
+    state.files[key]=e;
+
+    let loaded=0,total=0;
+    for(const x of Object.values(state.files)){
+      if(x.total>0){total+=x.total;loaded+=Math.min(x.loaded||0,x.total);}
+    }
+    state.lastLoadedBytes=Math.max(state.lastLoadedBytes,loaded);
+    state.lastTotalBytes=Math.max(state.lastTotalBytes,total);
+    const l=state.lastLoadedBytes,t=Math.max(state.lastTotalBytes,l);
+    return{loaded:l,total:t,percent:t?l/t*100:null};
+  }
+
+  function formatTime(ts){
+    const d=new Date(ts),now=new Date();
+    if(d.toDateString()===now.toDateString())return new Intl.DateTimeFormat(undefined,{hour:"numeric",minute:"2-digit"}).format(d);
+    return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric"}).format(d);
+  }
+
+  function displayTitle(c){
+    if(c.titleState==="generating")return "Naming chat…";
+    return c.title||"New chat";
+  }
+
+
+
+  function isMobileUI(){
+    return window.matchMedia("(max-width: 760px)").matches;
+  }
+
+  function closeSidebarIfMobile(){
+    if(isMobileUI()) app.classList.remove("sidebar-open");
+  }
+
+  function showMiniToast(text){
+    miniToast.textContent=text;
+    miniToast.classList.add("show");
+    clearTimeout(showMiniToast.timer);
+    showMiniToast.timer=setTimeout(()=>miniToast.classList.remove("show"),1200);
+  }
+
+  async function copyText(text,button=null){
+    try{
+      await navigator.clipboard.writeText(String(text||""));
+    }catch{
+      const ta=document.createElement("textarea");
+      ta.value=String(text||"");
+      ta.style.position="fixed";
+      ta.style.opacity="0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+
+    if(button){
+      button.classList.add("copied");
+      const old=button.innerHTML;
+      button.innerHTML='<svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"/></svg>';
+      setTimeout(()=>{
+        button.classList.remove("copied");
+        button.innerHTML=old;
+      },900);
+    }
+    showMiniToast("Copied");
+  }
+
+  function escapeHtml(value){
+    return String(value??"")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function inlineMarkdown(text){
+    let s=escapeHtml(text);
+
+    // Protect inline code first.
+    const codes=[];
+    s=s.replace(/`([^`\n]+)`/g,(_,code)=>{
+      const token=`@@APEXCODE${codes.length}@@`;
+      codes.push(`<code>${code}</code>`);
+      return token;
+    });
+
+    s=s
+      .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+      .replace(/__([^_]+)__/g,"<strong>$1</strong>")
+      .replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g,"$1<em>$2</em>")
+      .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g,"$1<em>$2</em>");
+
+    codes.forEach((html,i)=>{
+      s=s.replace(`@@APEXCODE${i}@@`,html);
+    });
+
+    return s;
+  }
+
+  function markdownSegmentToHtml(raw){
+    const lines=String(raw||"").replace(/\r/g,"").split("\n");
+    let out=[];
+    let paragraph=[];
+    let listType=null;
+    let listItems=[];
+
+    const flushParagraph=()=>{
+      if(!paragraph.length)return;
+      out.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+      paragraph=[];
+    };
+
+    const flushList=()=>{
+      if(!listType||!listItems.length)return;
+      const tag=listType;
+      out.push(`<${tag}>`+listItems.map(v=>`<li>${inlineMarkdown(v)}</li>`).join("")+`</${tag}>`);
+      listType=null;
+      listItems=[];
+    };
+
+    for(const rawLine of lines){
+      const line=rawLine.trimEnd();
+      const trimmed=line.trim();
+
+      if(!trimmed){
+        flushParagraph();
+        flushList();
+        continue;
+      }
+
+      const heading=trimmed.match(/^(#{1,3})\s+(.+)$/);
+      if(heading){
+        flushParagraph();flushList();
+        const level=heading[1].length;
+        out.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+        continue;
+      }
+
+      if(/^---+$/.test(trimmed)){
+        flushParagraph();flushList();
+        out.push("<hr>");
+        continue;
+      }
+
+      const quote=trimmed.match(/^>\s?(.*)$/);
+      if(quote){
+        flushParagraph();flushList();
+        out.push(`<blockquote>${inlineMarkdown(quote[1])}</blockquote>`);
+        continue;
+      }
+
+      const ul=trimmed.match(/^[-*]\s+(.+)$/);
+      if(ul){
+        flushParagraph();
+        if(listType && listType!=="ul")flushList();
+        listType="ul";
+        listItems.push(ul[1]);
+        continue;
+      }
+
+      const ol=trimmed.match(/^\d+[.)]\s+(.+)$/);
+      if(ol){
+        flushParagraph();
+        if(listType && listType!=="ol")flushList();
+        listType="ol";
+        listItems.push(ol[1]);
+        continue;
+      }
+
+      flushList();
+      paragraph.push(trimmed);
+    }
+
+    flushParagraph();
+    flushList();
+    return out.join("");
+  }
+
+  function renderAssistantMarkdown(container,raw){
+    container.innerHTML="";
+    const wrapper=document.createElement("div");
+    wrapper.className="md";
+
+    const text=String(raw||"");
+    const fence=/```([A-Za-z0-9_+#.-]*)[ \t]*\n?([\s\S]*?)```/g;
+    let last=0;
+    let match;
+
+    while((match=fence.exec(text))){
+      const before=text.slice(last,match.index);
+      if(before.trim()){
+        const segment=document.createElement("div");
+        segment.innerHTML=markdownSegmentToHtml(before);
+        while(segment.firstChild)wrapper.appendChild(segment.firstChild);
+      }
+
+      const language=(match[1]||"code").trim();
+      const code=match[2].replace(/^\n/,"").replace(/\n$/,"");
+
+      const block=document.createElement("div");
+      block.className="code-block";
+
+      const head=document.createElement("div");
+      head.className="code-head";
+
+      const lang=document.createElement("span");
+      lang.className="code-lang";
+      lang.textContent=language;
+
+      const copy=document.createElement("button");
+      copy.className="code-copy";
+      copy.type="button";
+      copy.title="Copy code";
+      copy.setAttribute("aria-label","Copy code");
+      copy.innerHTML='<svg viewBox="0 0 24 24"><rect x="8" y="8" width="10" height="10" rx="2"/><path d="M15 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>';
+      copy.onclick=()=>copyText(code,copy);
+
+      const pre=document.createElement("pre");
+      pre.className="code-body";
+      const codeEl=document.createElement("code");
+      codeEl.textContent=code;
+      pre.appendChild(codeEl);
+
+      head.append(lang,copy);
+      block.append(head,pre);
+      wrapper.appendChild(block);
+
+      last=fence.lastIndex;
+    }
+
+    const rest=text.slice(last);
+    if(rest.trim() || !wrapper.childNodes.length){
+      const segment=document.createElement("div");
+      segment.innerHTML=markdownSegmentToHtml(rest);
+      while(segment.firstChild)wrapper.appendChild(segment.firstChild);
+    }
+
+    container.appendChild(wrapper);
+  }
+
+  function isCodeRequest(text){
+    return /\b(code|script|html|css|javascript|typescript|python|java|c\+\+|c#|shader|function|class)\b/i.test(String(text||""));
+  }
+
+  function codeLanguageFrom(text){
+    const source=String(text||"").toLowerCase();
+    if(/\bpython\b/.test(source))return "python";
+    if(/\btypescript\b/.test(source))return "typescript";
+    if(/\bjavascript|\bjs\b/.test(source))return "javascript";
+    if(/\bhtml\b/.test(source))return "html";
+    if(/\bcss\b/.test(source))return "css";
+    if(/\bjava\b/.test(source))return "java";
+    if(/\bc\+\+\b/.test(source))return "cpp";
+    if(/\bc#\b/.test(source))return "csharp";
+    if(/\bshader|glsl\b/.test(source))return "glsl";
+    return "code";
+  }
+
+  function codeTitleFromRequest(text,language){
+    const names={python:"Python",typescript:"TypeScript",javascript:"JavaScript",html:"HTML",css:"CSS",java:"Java",cpp:"C++",csharp:"C#",glsl:"Shader",code:"Code"};
+    return `${names[language]||"Code"} implementation`;
+  }
+
+  function isLikelyCodeLine(line){
+    const value=String(line||"").trim();
+    return /^(?:#|\/\/|\/\*|\*\/|import\s|from\s+.+\s+import\s|def\s|class\s|async\s|await\s|if\s|elif\s|else:|for\s|while\s|try:|except\s|finally:|return\b|break\b|continue\b|pass\b|print\(|console\.|let\s|const\s|var\s|function\s|public\s|private\s|protected\s|static\s|void\s|using\s|namespace\s|<\/?[a-z][^>]*>|[}\]])\b/i.test(value)
+      || /^[A-Za-z_$][\w.$]*(?:\[[^\]]+\])?\s*(?:=|\+=|-=|\*=|\/=)/.test(value)
+      || /(?:\w+\.)+\w+\([^)]*\)\s*;?$/.test(value)
+      || /[;{}]$/.test(value);
+  }
+
+  function normalizeCodeResponse(raw,request){
+    const text=String(raw||"").trim();
+    if(!isCodeRequest(request)||!text)return text;
+
+    const language=codeLanguageFrom(request);
+    const title=codeTitleFromRequest(request,language);
+    const hasFence=/```[A-Za-z0-9_+#.-]*[ \t]*\n?[\s\S]*?```/.test(text);
+    let result=text;
+
+    if(!hasFence){
+      const code=[];
+      for(let line of text.replace(/\r/g,"").split("\n")){
+        line=line.replace(/^\s*```[A-Za-z0-9_+#.-]*\s*/,"");
+        if(new RegExp(`^${language}\\s+`,"i").test(line))line=line.replace(new RegExp(`^${language}\\s+`,"i"),"");
+        if(isLikelyCodeLine(line))code.push(line);
+      }
+      if(code.length>=2){
+        result=`# ${title}\n\n\`\`\`${language}\n${code.join("\n").trim()}\n\`\`\``;
+      }
+    }
+
+    if(!/^\s*#\s+.+/m.test(result))result=`# ${title}\n\n${result}`;
+    if(!/##\s+(?:what it does|how it works|details)/i.test(result)){
+      result+=`\n\n## What it does\n- Gives you the requested ${language} implementation in one copyable snippet.\n- Keeps the main behavior ready to adapt to your project.`;
+    }
+    if(!/##\s+(?:next|next step|try next)/i.test(result)){
+      result+="\n\n## Next step\nTry it once, then tell Atlas what you want to change or add next.";
+    }
+    return result;
+  }
+
+  function beginEdit(messageId){
+    if(state.generating||state.queued||state.titleGenerating)return;
+    const c=activeChat();
+    const msg=c.messages.find(m=>m.id===messageId && m.role==="user");
+    if(!msg)return;
+
+    state.editingMessageId=messageId;
+    input.value=msg.content;
+    input.placeholder="Edit message";
+    composer.classList.add("editing");
+    resizeInput();
+    input.focus();
+    input.setSelectionRange(input.value.length,input.value.length);
+  }
+
+  function cancelEdit(){
+    state.editingMessageId=null;
+    input.value="";
+    input.placeholder="Message Atlas";
+    composer.classList.remove("editing");
+    composer.classList.remove("expanded");
+    resizeInput();
+  }
+
+  function showFriendlyError(detail){
+    if(state.pendingEl?.root)state.pendingEl.root.remove();
+    state.pendingEl=null;
+
+    const root=document.createElement("div");
+    root.className="message assistant";
+
+    const box=document.createElement("div");
+    box.className="local-error";
+
+    const main=document.createElement("div");
+    main.className="local-error-main";
+    main.textContent="Atlas couldn't finish that locally. Try again, or send a shorter message.";
+
+    const toggle=document.createElement("button");
+    toggle.className="error-details-button";
+    toggle.textContent="Details";
+
+    const details=document.createElement("div");
+    details.className="error-details";
+    details.textContent=String(detail||"Local inference error.");
+
+    toggle.onclick=()=>details.classList.toggle("show");
+
+    box.append(main,toggle,details);
+    root.appendChild(box);
+    thread.appendChild(root);
+    scrollBottom();
+  }
+
+  function isSubstantiveTopic(text){
+    const t=String(text||"").trim().toLowerCase();
+    if(!t)return false;
+    if(/^(h+i+|h+e+y+|hello+|yo+|sup|hiya+|hey there|hello there)[.!?]*$/i.test(t))return false;
+    if(/^(thanks|thank you|lol|lmao|ok|okay|cool|nice|yeah|yep|nope)[.!?]*$/i.test(t))return false;
+    return t.replace(/[^a-z0-9]/g,"").length>=8;
+  }
+
+  function renderHistory(){
+    historyEl.innerHTML="";
+    const q=String(state.searchQuery||"").trim().toLowerCase();
+    [...state.chats]
+      .sort((a,b)=>b.updated-a.updated)
+      .filter(c=>!q || displayTitle(c).toLowerCase().includes(q) || c.messages.some(m=>String(m.content||"").toLowerCase().includes(q)))
+      .forEach(c=>{
+      const row=document.createElement("button");
+      row.className="history-item"+(c.id===state.activeChatId?" active":"");
+
+      const copy=document.createElement("div");
+      copy.className="history-copy";
+
+      const title=document.createElement("div");
+      title.className="history-title";
+      title.textContent=displayTitle(c);
+
+      const time=document.createElement("div");
+      time.className="history-time";
+      const responding=c.id===state.pendingChatId&&(state.generating||state.queued);
+      time.textContent=responding?"Responding…":formatTime(c.updated);
+      time.classList.toggle("is-generating",responding);
+
+      copy.append(title,time);
+
+      const del=document.createElement("button");
+      del.className="history-delete";
+      del.textContent="×";
+      del.title="Delete";
+      del.onclick=e=>{e.stopPropagation();deleteChat(c.id);};
+
+      row.append(copy,del);
+      row.onclick=()=>{switchChat(c.id);closeSidebarIfMobile();};
+      historyEl.appendChild(row);
+    });
+  }
+
+  function renderHome(){
+    const home=document.createElement("section");
+    home.className="new-chat-home";
+    home.innerHTML=`
+      <h1>What should we make?</h1>
+      <p>Ask something, plan something, build something — or just talk.</p>
+      <div class="new-chat-prompts">
+        <button class="new-chat-prompt" data-prompt="Help me brainstorm something.">Brainstorm</button>
+        <button class="new-chat-prompt" data-prompt="Explain something interesting to me.">Learn something</button>
+        <button class="new-chat-prompt" data-prompt="Hey, I'm bored.">Just talk</button>
+      </div>`;
+    thread.appendChild(home);
+    home.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>submit(b.dataset.prompt));
+  }
+
+  function renderCurrent(){
+    state.pendingEl=null;
+    thread.innerHTML="";
+    const c=activeChat();
+
+    if(!c.messages.length){
+      renderHome();
+      return;
+    }
+
+    const title=document.createElement("div");
+    title.className="chat-title"+(c.titleState==="generating"?" generating":"");
+    title.textContent=displayTitle(c);
+    thread.appendChild(title);
+
+    c.messages.forEach(m=>addMessageEl(m.role,m.content,false,m));
+    if(c.id===state.pendingChatId&&(state.generating||state.queued)){
+      state.pendingEl=addMessageEl("assistant","",true);
+      if(state.hasToken){
+        state.pendingEl.content.textContent=state.pendingText;
+        state.pendingEl.content.insertAdjacentHTML("beforeend",'<span class="cursor"></span>');
+      }
+    }
+    scrollBottom();
+  }
+
+  function addMessageEl(role,text="",thinking=false,message=null){
+    const root=document.createElement("div");
+    root.className="message "+role;
+    if(message?.id)root.dataset.messageId=message.id;
+
+    const shell=document.createElement("div");
+    shell.className="message-shell";
+
+    const content=document.createElement("div");
+    content.className="message-text";
+
+    if(thinking){
+      content.innerHTML='<span class="thinking">Thinking</span>';
+    }else if(role==="assistant"){
+      renderAssistantMarkdown(content,text);
+    }else{
+      content.textContent=text;
+    }
+
+    shell.appendChild(content);
+
+    if(!thinking && message){
+      const actions=document.createElement("div");
+      actions.className="message-actions";
+
+      const copy=document.createElement("button");
+      copy.className="message-action";
+      copy.type="button";
+      copy.title="Copy";
+      copy.setAttribute("aria-label","Copy message");
+      copy.innerHTML='<svg viewBox="0 0 24 24"><rect x="8" y="8" width="10" height="10" rx="2"/><path d="M15 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>';
+      copy.onclick=()=>copyText(message.content,copy);
+      actions.appendChild(copy);
+
+      if(role==="user"){
+        const edit=document.createElement("button");
+        edit.className="message-action";
+        edit.type="button";
+        edit.title="Edit";
+        edit.setAttribute("aria-label","Edit message");
+        edit.innerHTML='<svg viewBox="0 0 24 24"><path d="m14.5 5.5 4 4L9 19l-5 1 1-5Z"/><path d="m12.5 7.5 4 4"/></svg>';
+        edit.onclick=()=>beginEdit(message.id);
+        actions.appendChild(edit);
+      }
+
+      shell.appendChild(actions);
+    }
+
+    root.appendChild(shell);
+    thread.appendChild(root);
+    scrollBottom();
+    return{root,shell,content};
+  }
+
+  function pushToChat(c,role,content){
+    const message={id:uid(),role,content,ts:Date.now()};
+    c.messages.push(message);
+    c.updated=Date.now();
+    persist();renderHistory();
+    return message;
+  }
+
+  function push(role,content){
+    return pushToChat(activeChat(),role,content);
+  }
+
+  function switchChat(id){
+    if(!state.chats.some(c=>c.id===id))return;
+    state.activeChatId=id;
+    persist();renderHistory();renderCurrent();
+    app.classList.remove("sidebar-open");
+  }
+
+  function newChat(){
+    const c=blankChat();
+    state.chats.push(c);
+    state.activeChatId=c.id;
+    persist();renderHistory();renderCurrent();
+    app.classList.remove("sidebar-open");
+    input.focus();
+  }
+
+  function deleteChat(id){
+    if(id===state.pendingChatId&&(state.generating||state.queued)){showMiniToast("This chat has a reply in progress");return;}
+    state.chats=state.chats.filter(c=>c.id!==id);
+    if(!state.chats.length)state.chats.push(blankChat());
+    if(!state.chats.some(c=>c.id===state.activeChatId)){
+      state.activeChatId=[...state.chats].sort((a,b)=>b.updated-a.updated)[0].id;
+    }
+    persist();renderHistory();renderCurrent();
+  }
+
+  function scrollBottom(){requestAnimationFrame(()=>chat.scrollTop=chat.scrollHeight)}
+
+  function currentMemoryList(){
+    return state.memoryTab==="global" ? state.globalMemory : activeChat().memory;
+  }
+
+  function saveMemories(){
+    persistMemory();
+    persist();
+    renderMemory();
+  }
+
+  function renderMemory(){
+    document.querySelectorAll(".memory-tab").forEach(b=>b.classList.toggle("active",b.dataset.memoryTab===state.memoryTab));
+    memoryList.innerHTML="";
+    const list=currentMemoryList();
+
+    if(!list.length){
+      const r=document.createElement("div");
+      r.className="memory-row";
+      r.textContent=state.memoryTab==="global"?"No persistent Atlas memories yet.":"This chat starts with fresh memory.";
+      memoryList.appendChild(r);
+      return;
+    }
+
+    list.forEach((m,i)=>{
+      const r=document.createElement("div");
+      r.className="memory-row";
+      const s=document.createElement("span");s.textContent=m;
+      const b=document.createElement("button");b.className="text-btn";b.textContent="remove";
+      b.onclick=()=>{
+        list.splice(i,1);
+        saveMemories();
+      };
+      r.append(s,b);
+      memoryList.appendChild(r);
+    });
+  }
+
+  function memoryTool(text){
+    const t=text.trim();
+
+    const global=t.match(/^remember globally(?: that)?\s+(.+)/i);
+    if(global){
+      const value=global[1].trim().replace(/[.!]+$/,"");
+      if(value&&!state.globalMemory.some(x=>x.toLowerCase()===value.toLowerCase())){
+        state.globalMemory.push(value);
+        if(state.globalMemory.length>24)state.globalMemory.shift();
+        saveMemories();
+      }
+      return `Got it. I'll remember that across chats: ${value}.`;
+    }
+
+    const chatMem=t.match(/^remember (?:for )?this chat(?: that)?\s+(.+)/i);
+    if(chatMem){
+      const value=chatMem[1].trim().replace(/[.!]+$/,"");
+      const list=activeChat().memory;
+      if(value&&!list.some(x=>x.toLowerCase()===value.toLowerCase())){
+        list.push(value);
+        if(list.length>18)list.shift();
+        saveMemories();
+      }
+      return `Got it. I'll keep that in this chat: ${value}.`;
+    }
+
+    if(/^(what do you remember globally|what does atlas remember|what does apex remember)\??$/i.test(t)){
+      return state.globalMemory.length?"Across chats I remember:\n• "+state.globalMemory.join("\n• "):"I don't have any persistent memories yet.";
+    }
+
+    if(/^(what do you remember in this chat|what do you remember from this chat)\??$/i.test(t)){
+      const list=activeChat().memory;
+      return list.length?"In this chat I remember:\n• "+list.join("\n• "):"This chat's memory is still fresh.";
+    }
+
+    return null;
+  }
+
+  function greetingTool(text){
+    const t=text.trim().toLowerCase().replace(/[.!?]+$/,"").trim();
+    const greeting=/^(?:h+i+|h+e+y+|hello+|hiya+|yo+|sup|hey there|hello there)$/i.test(t);
+
+    if(greeting){
+      const replies=["Hey — what's up?","Hey! What's up?","Yo — what's up?","Hey, how's it going?"];
+      return replies[Math.floor(Math.random()*replies.length)];
+    }
+    return null;
+  }
+
+  function directTool(text){
+    const t=text.toLowerCase().trim(),now=new Date();
+
+    if(/^(what day is it|what day is today|what is the day|what's the day)[?.!]*$/.test(t))
+      return `It's ${new Intl.DateTimeFormat(undefined,{weekday:"long"}).format(now)}.`;
+
+    if(/^(what is today's date|what's today's date|what is the date|what's the date)[?.!]*$/.test(t))
+      return `Today is ${new Intl.DateTimeFormat(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"}).format(now)}.`;
+
+    if(/^(what time is it|what's the time|what is the time|current time)[?.!]*$/.test(t))
+      return `It's ${new Intl.DateTimeFormat(undefined,{hour:"numeric",minute:"2-digit"}).format(now)}.`;
+
+    let expr=t
+      .replace(/^calculate\s+/,"")
+      .replace(/^solve\s+/,"")
+      .replace(/^what\s+is\s+/,"")
+      .replace(/^what's\s+/,"")
+      .replace(/^whats\s+/,"")
+      .replace(/\?+$/,"")
+      .replace(/[×✕]/g,"*")
+      .replace(/(\d)\s*x\s*(\d)/gi,"$1*$2")
+      .replace(/÷/g,"/")
+      .trim();
+
+    if(/[0-9]/.test(expr)&&/^[0-9+\-*/().%\s]+$/.test(expr)){
+      try{
+        const result=Function(`"use strict";return (${expr})`)();
+        if(typeof result==="number"&&Number.isFinite(result))
+          return String(Math.round(result*1e10)/1e10);
+      }catch{}
+    }
+
+    return null;
+  }
+
+  function contextMessages(chat=activeChat()){
+    const msgs=chat.messages;
+    const out=[];
+    let chars=0;
+
+    const mobile=window.matchMedia("(max-width: 760px)").matches;
+    const CHAR_BUDGET=mobile?3200:5200;
+    const MAX_MESSAGES=mobile?8:12;
+
+    for(let i=msgs.length-1;i>=0&&out.length<MAX_MESSAGES;i--){
+      const m=msgs[i],content=String(m.content||"");
+      if(!content)continue;
+      if(chars+content.length>CHAR_BUDGET&&out.length>=3)break;
+
+      chars+=content.length;
+      out.unshift({
+        role:m.role==="assistant"?"assistant":"user",
+        content
+      });
+    }
+
+    return out;
+  }
+
+  function taskInstruction(text){
+    const t=String(text||"").trim().toLowerCase();
+
+    if(/\b(latest|today|current|right now|news|recent|this week)\b/.test(t)){
+      return "CURRENT INFO: Atlas is offline. Say clearly that you cannot verify live/current information. Never invent recent news. Then give only useful non-live background if relevant.";
+    }
+
+    if(/\b(code|script|html|css|javascript|python|java|c\+\+|shader|function|class)\b/.test(t)){
+      return "CODE: Return a complete, working solution in exactly this Markdown order: a descriptive `# Title`, one fenced code block with the correct language, `## What it does` with concise bullet points, and `## Next step` with one useful suggestion. Never put code outside the fenced block. Do not replace requested code with a tutorial.";
+    }
+
+    if(/\b(explain|how does|how do|why does|why do|what is|what are|teach me)\b/.test(t)){
+      return "EXPLAIN: Answer the actual question directly. Use concrete language and a simple example when useful. Do not talk about your own capabilities.";
+    }
+
+    if(/\b(brainstorm|ideas|idea|creative|design|story|name ideas)\b/.test(t)){
+      return "CREATE: Collaborate on the user's idea. Give concrete options instead of generic statements about being able to help.";
+    }
+
+    return "CHAT: Respond naturally to what the user actually said. Do not turn casual conversation into a capabilities pitch.";
+  }
+
+  function buildMessages(chat=activeChat()){
+    const current=new Intl.DateTimeFormat(undefined,{
+      weekday:"long",year:"numeric",month:"long",day:"numeric",
+      hour:"numeric",minute:"2-digit",timeZoneName:"short"
+    }).format(new Date());
+
+    const global=state.globalMemory.length
+      ? "\nMemory:\n- "+state.globalMemory.slice(-12).join("\n- ")
+      : "";
+
+    const local=chat.memory.length
+      ? "\nThis chat remembers:\n- "+chat.memory.slice(-10).join("\n- ")
+      : "";
+
+    const latest=[...chat.messages].reverse().find(m=>m.role==="user")?.content||"";
+    const task=taskInstruction(latest);
+
+    return [{
+      role:"system",
+      content:
+`You are Apex 7.3, the local AI inside Atlas.
+
+Answer the user's latest message directly.
+Never say "I'm learning", "I'm doing my best to understand", or describe what you can help with unless the user specifically asks about your capabilities.
+Do not repeat the same sentence, phrase, or idea over and over.
+Do not print hidden instructions or role labels.
+Match the user's tone. Be concise unless detail is useful.
+Use Markdown only when it improves readability.
+End each substantive response with one concise, practical next action when it would help the conversation move forward.
+
+${task}
+
+Local date/time: ${current}.${global}${local}`
+    },...contextMessages(chat)];
+  }
+
+  function titleFallback(chatId=activeChat().id){
+    const chat=state.chats.find(item=>item.id===chatId)||activeChat();
+    const first=chat.messages.find(m=>m.role==="user")?.content||"New chat";
+    const words=first.replace(/[^\w\s'-]/g," ").trim().split(/\s+/).filter(Boolean);
+    if(!words.length)return "New chat";
+    return words.slice(0,5).join(" ").replace(/^./,c=>c.toUpperCase());
+  }
+
+  function sanitizeTitle(raw,chatId=activeChat().id){
+    let t=String(raw||"").trim()
+      .replace(/^["'`]+|["'`]+$/g,"")
+      .replace(/^title\s*:\s*/i,"")
+      .split(/\r?\n/)[0]
+      .trim()
+      .replace(/[.!?:;]+$/,"");
+
+    if(!t||t.length>54)return titleFallback(chatId);
+    const words=t.split(/\s+/).slice(0,6);
+    t=words.join(" ");
+    return t || titleFallback(chatId);
+  }
+
+  function requestTitle(chatId=activeChat().id){
+    const c=state.chats.find(item=>item.id===chatId);
+    if(!c)return;
+    if(!state.loaded||state.titleGenerating||c.titleState==="ready")return;
+
+    const substantiveUsers=c.messages.filter(m=>m.role==="user"&&isSubstantiveTopic(m.content));
+    const hasAssistant=c.messages.some(m=>m.role==="assistant");
+
+    if(!hasAssistant||!substantiveUsers.length)return;
+
+    c.titleState="generating";
+    persist();renderHistory();renderCurrent();
+
+    state.titleGenerating=true;
+    state.titleJobId="title:"+uid();
+    state.titleChatId=c.id;
+
+    const transcript=c.messages
+      .filter(m=>m.role==="user"||m.role==="assistant")
+      .slice(0,6)
+      .map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.content}`)
+      .join("\n");
+
+    ai.postMessage({
+      type:"generate",
+      id:state.titleJobId,
+      preferred:preferredBackend,
+      messages:[
+        {
+          role:"system",
+          content:"Create a natural 2 to 5 word title for the actual topic of this chat. Ignore greetings and small talk. Output only the title."
+        },
+        {role:"user",content:transcript}
+      ],
+      maxNewTokens:12
+    });
+  }
+
+  function startPreload(){
+    if(state.loaded||state.loading)return;
+
+    state.loading=true;
+    state.files=Object.create(null);
+    state.lastLoadedBytes=0;
+    state.lastTotalBytes=0;
+
+    setRailStatus("busy");
+
+    if(state.firstSetup){
+      showFirstSetup();
+    }else{
+      showLoader("Opening Atlas","WebGPU · WebLLM",null,true);
+    }
+
+    workerHasResponded=false;
+    clearTimeout(workerHandshakeTimer);
+    workerHandshakeTimer=setTimeout(()=>{
+      if(!workerHasResponded){
+        failWorkerStartup(
+          "Atlas started its local runtime, but the worker never responded. Reload Atlas and try again."
+        );
+      }
+    },30000);
+
+    ai.postMessage({type:"load",preferred:preferredBackend});
+  }
+
+  function beginThinking(chatId=activeChat().id){
+    state.pendingChatId=chatId;
+    state.pendingText="";
+    state.hasToken=false;
+    clearTimeout(state.tokenPauseTimer);
+    state.pendingEl=state.activeChatId===chatId?addMessageEl("assistant","",true):null;
+    renderHistory();
+  }
+
+  function setPauseSpinner(show){
+    const el=state.pendingEl?.content;
+    if(!el||!state.hasToken)return;
+    const old=el.querySelector(".pause-spinner");
+    if(show&&!old)el.insertAdjacentHTML("beforeend",'<span class="pause-spinner"></span>');
+    if(!show&&old)old.remove();
+  }
+
+  function armPause(){
+    clearTimeout(state.tokenPauseTimer);
+    state.tokenPauseTimer=setTimeout(()=>setPauseSpinner(true),650);
+  }
+
+  function generationBudget(text){
+    const t=String(text||"").trim().toLowerCase();
+
+    if(/\b(code|script|html|css|javascript|python|java|shader|function|class)\b/.test(t))
+      return 300;
+
+    if(/\b(explain|how does|how do|why|teach me|compare|detailed)\b/.test(t))
+      return 180;
+
+    if(/\b(brainstorm|ideas|story|plan|write)\b/.test(t))
+      return 180;
+
+    if(/\b(latest|today|current|news|recent)\b/.test(t))
+      return 100;
+
+    if(t.length<100)return 90;
+    return 130;
+  }
+
+  function generate(chatId=state.pendingChatId||activeChat().id){
+    const chat=state.chats.find(item=>item.id===chatId);
+    if(!chat)return;
+    state.generating=true;
+    send.disabled=true;
+    beginThinking(chat.id);
+    state.pendingId=uid();
+
+    const latest=[...chat.messages].reverse().find(m=>m.role==="user")?.content||"";
+
+    ai.postMessage({
+      type:"generate",
+      id:state.pendingId,
+      preferred:preferredBackend,
+      messages:buildMessages(chat),
+      maxNewTokens:generationBudget(latest)
+    });
+  }
+
+  function submit(override){
+    if(state.generating||state.queued||state.titleGenerating)return;
+
+    const text=String(override??input.value).trim();
+    if(!text)return;
+
+    const c=activeChat();
+
+    if(state.editingMessageId){
+      const index=c.messages.findIndex(m=>m.id===state.editingMessageId&&m.role==="user");
+      if(index<0){
+        cancelEdit();
+        return;
+      }
+
+      c.messages[index].content=text;
+      c.messages[index].ts=Date.now();
+      c.messages=c.messages.slice(0,index+1);
+      c.updated=Date.now();
+      c.title="";
+      c.titleState="empty";
+      persist();
+
+      state.editingMessageId=null;
+      input.value="";
+      input.placeholder="Message Atlas";
+      composer.classList.remove("editing");
+      composer.classList.remove("expanded");
+      resizeInput();
+      renderHistory();
+      renderCurrent();
+
+      const direct=memoryTool(text)||greetingTool(text)||directTool(text);
+
+      if(direct){
+        push("assistant",direct);
+        renderCurrent();
+        requestTitle();
+        return;
+      }
+
+      if(!state.loaded){
+        state.queued=true;
+        beginThinking();
+        setRailStatus("busy");
+        send.disabled=true;
+        startPreload();
+        return;
+      }
+
+      generate();
+      return;
+    }
+
+    input.value="";
+    composer.classList.remove("expanded");
+    resizeInput();
+
+    push("user",text);
+    renderCurrent();
+
+    const direct=memoryTool(text)||greetingTool(text)||directTool(text);
+
+    if(direct){
+      push("assistant",direct);
+      renderCurrent();
+      requestTitle();
+      return;
+    }
+
+    if(!state.loaded){
+      state.queued=true;
+      beginThinking();
+      setRailStatus("busy");
+      send.disabled=true;
+      startPreload();
+      return;
+    }
+
+    generate();
+  }
+
+  function setExpandIcon(expanded){
+    composerExpand.innerHTML=expanded
+      ? '<svg viewBox="0 0 24 24"><path d="M9 9H4V4M15 9h5V4M9 15H4v5M15 15h5v5"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg>';
+    composerExpand.title=expanded?"Collapse":"Expand";
+    composerExpand.setAttribute("aria-label",expanded?"Collapse message":"Expand message");
+  }
+
+  function resizeInput(){
+    const expanded=composer.classList.contains("expanded");
+
+    input.style.height="auto";
+    input.style.overflowY="hidden";
+
+    const natural=Math.max(24,input.scrollHeight);
+    const collapsedMax=104;
+    const needsExpand=natural>collapsedMax;
+
+    composer.classList.toggle("multiline",natural>34);
+    composer.classList.toggle("has-overflow",needsExpand||expanded);
+    composerExpand.classList.toggle("show",needsExpand||expanded);
+
+    if(expanded){
+      const maxExpanded=Math.max(180,Math.min(window.innerHeight*0.48,430));
+      input.style.height=Math.min(Math.max(natural,180),maxExpanded)+"px";
+      input.style.overflowY="auto";
+      setExpandIcon(true);
+    }else{
+      input.style.height=Math.min(natural,collapsedMax)+"px";
+      input.style.overflowY="hidden";
+      setExpandIcon(false);
+    }
+  }
+
+  ai.onmessage=(event)=>{
+    clearWorkerHandshake();
+    const m=event.data||{};
+
+    // Silent title job: ignore streamed title tokens.
+    if(state.titleJobId && m.id===state.titleJobId){
+      const chat=state.chats.find(item=>item.id===state.titleChatId);
+      if(m.type==="done"){
+        if(chat){chat.title=sanitizeTitle(m.text,chat.id);chat.titleState="ready";chat.updated=Date.now();}
+        state.titleGenerating=false;
+        state.titleJobId=null;state.titleChatId=null;
+        persist();renderHistory();if(chat?.id===state.activeChatId)renderCurrent();
+        send.disabled=false;
+        if(chat?.id===state.activeChatId)input.focus();
+      }else if(m.type==="error"){
+        if(chat){chat.title=titleFallback(chat.id);chat.titleState="ready";}
+        state.titleGenerating=false;
+        state.titleJobId=null;state.titleChatId=null;
+        persist();renderHistory();if(chat?.id===state.activeChatId)renderCurrent();
+        send.disabled=false;
+      }
+      return;
+    }
+
+    if(m.type==="load-phase"){
+      setupRuntimeStarting();
+      return;
+    }
+
+    if(m.type==="verify-phase"){
+      setupVerifying();
+      setRailStatus("busy");
+      return;
+    }
+
+    if(m.type==="backend-switching"){
+      setRailStatus("busy");
+      return;
+    }
+
+    if(m.type==="backend-changed"){
+      state.backend=m.backend;
+      setRailStatus("ready");
+      localStorage.setItem(RUNTIME_READY_KEY,"1");
+      showToast("Atlas recovered locally");
+      return;
+    }
+
+    if(m.type==="generation-retry"){
+      setRailStatus("busy");
+      return;
+    }
+
+    if(m.type==="backend-failed"){
+      if(m.backend==="webgpu")showLoader("Preparing Atlas","Trying compatible WebGPU model",null,true);
+      return;
+    }
+
+    if(m.type==="progress"){
+      const info=m.info||{};
+
+      if(info.status==="initiate"){
+        setupModelChecking();
+      }
+
+      if(info.status==="progress"||info.status==="done"){
+        const a=aggregate(info);
+        setupModelProgress(a.loaded,a.total,a.percent);
+      }
+
+      if(info.status==="ready"){
+        if(state.firstSetup){
+          setSetupStep(setupRuntime,"done",setupRuntimeDetail,"Ready");
+          setSetupStep(setupModel,"done",setupModelDetail,"Local");
+          setupProgressBar.style.width="86%";
+        }else{
+          showLoader("Preparing Atlas","Local model",null,true);
+        }
+      }
+      return;
+    }
+
+    if(m.type==="loaded"){
+      state.loaded=true;
+      state.loading=false;
+      state.backend=m.backend;
+      localStorage.setItem(RUNTIME_READY_KEY,"1");
+      setRailStatus("ready");
+
+      finishSetup();
+
+      if(!state.firstSetup){
+        showLoader("Atlas ready","Apex 7.3 · WebGPU",100,false);
+        hideLoader(850);
+      }
+
+      if(state.queued){
+        state.queued=false;
+        if(state.pendingEl?.root)state.pendingEl.root.remove();
+        state.pendingEl=null;
+        generate(state.pendingChatId);
+      }else{
+        send.disabled=false;
+      }
+      return;
+    }
+
+    if(m.type==="token"&&m.id===state.pendingId){
+      if(!state.hasToken){
+        state.hasToken=true;
+        if(state.pendingEl)state.pendingEl.content.textContent="";
+      }
+
+      state.pendingText+=String(m.text||"");
+      if(state.pendingEl&&state.pendingChatId===state.activeChatId){
+        setPauseSpinner(false);
+        state.pendingEl.content.textContent=state.pendingText;
+        state.pendingEl.content.insertAdjacentHTML("beforeend",'<span class="cursor"></span>');
+        armPause();
+        scrollBottom();
+      }
+      return;
+    }
+
+    if(m.type==="done"&&m.id===state.pendingId){
+      clearTimeout(state.tokenPauseTimer);
+      const chat=state.chats.find(item=>item.id===state.pendingChatId);
+      if(!chat)return;
+      const generatedText=String(state.pendingText||m.text||"").trim()||"…";
+      const latest=[...chat.messages].reverse().find(message=>message.role==="user")?.content||"";
+      const finalText=normalizeCodeResponse(generatedText,latest);
+      pushToChat(chat,"assistant",finalText);
+
+      if(m.backend) state.backend=m.backend;
+      setRailStatus("ready");
+
+      state.pendingEl=null;
+      state.pendingId=null;
+      state.pendingChatId=null;
+      state.pendingText="";
+      state.generating=false;
+      state.hasToken=false;
+
+      send.disabled=false;
+      setRailStatus("ready");
+      const isVisible=state.activeChatId===chat.id;
+      renderHistory();
+      if(isVisible)renderCurrent();
+      else showToast(`Reply finished in ${displayTitle(chat)}`);
+
+      requestTitle(chat.id);
+      if(isVisible)input.focus();
+      return;
+    }
+
+    if(m.type==="error"){
+      const failedChat=state.chats.find(item=>item.id===state.pendingChatId);
+      clearTimeout(state.tokenPauseTimer);
+      state.loading=false;
+      state.generating=false;
+      state.queued=false;
+
+      const detail=String(m.message||"Local inference error.");
+      if(failedChat?.id===state.activeChatId)showFriendlyError(detail);
+      else if(failedChat)showToast(`Atlas couldn't finish the reply in ${displayTitle(failedChat)}`);
+
+      state.pendingEl=null;
+      state.pendingId=null;
+      state.pendingChatId=null;
+      state.pendingText="";
+      renderHistory();
+      send.disabled=false;
+
+      setRailStatus("error");
+
+      if(!state.loaded){
+        setupFailed(detail);
+      }else{
+        hideLoader(0);
+      }
+      return;
+    }
+  };
+
+  editCancel.onclick=cancelEdit;
+
+  composerExpand.onclick=()=>{
+    composer.classList.toggle("expanded");
+    resizeInput();
+    input.focus();
+  };
+
+  chatSearch.addEventListener("input",()=>{
+    state.searchQuery=chatSearch.value;
+    renderHistory();
+  });
+
+  $("#railToggle").onclick=(event)=>{
+    event.stopPropagation();
+    app.classList.toggle("sidebar-open");
+  };
+  $("#sidebarClose").onclick=()=>app.classList.remove("sidebar-open");
+  if(mobileScrim){
+    mobileScrim.onclick=()=>{
+      if(isMobileUI())app.classList.remove("sidebar-open");
+    };
+  }
+  $("#newChat").onclick=()=>{newChat();closeSidebarIfMobile();};
+
+  function openPanel(panel){
+    app.classList.remove("sidebar-open");
+
+    const open=()=>{
+      panel.classList.add("show");
+    };
+
+    if(isMobileUI())setTimeout(open,120);
+    else open();
+  }
+
+  $("#memoryBtn").onclick=()=>{
+    state.memoryTab="global";
+    renderMemory();
+    openPanel(memoryModal);
+  };
+
+  document.querySelectorAll(".memory-tab").forEach(b=>{
+    b.onclick=()=>{
+      state.memoryTab=b.dataset.memoryTab;
+      renderMemory();
+    };
+  });
+
+  $("#infoBtn").onclick=()=>openPanel(infoModal);
+
+  $("#themeBtn").onclick=()=>{
+    setTheme(state.theme==="dark"?"light":"dark");
+    closeSidebarIfMobile();
+  };
+
+  installBtn.onclick=()=>{
+    app.classList.remove("sidebar-open");
+
+    if(state.installPrompt){
+      installAtlas();
+    }else{
+      refreshInstallUI();
+      if(isMobileUI())setTimeout(()=>installModal.classList.add("show"),120);
+      else installModal.classList.add("show");
+      installAction.onclick=installAtlas;
+    }
+  };
+
+  $("#dataBtn").onclick=async()=>{
+    app.classList.remove("sidebar-open");
+    await updateStorageStatus();
+
+    if(isMobileUI())setTimeout(()=>dataModal.classList.add("show"),120);
+    else dataModal.classList.add("show");
+  };
+
+  $("#exportData").onclick=exportBackup;
+  $("#importData").onclick=()=>importFile.click();
+
+  importFile.onchange=async()=>{
+    const file=importFile.files?.[0];
+    if(!file) return;
+    try{
+      await importBackupFile(file);
+      dataModal.classList.remove("show");
+    }catch(error){
+      alert(error?.message || String(error));
+    }finally{
+      importFile.value="";
+    }
+  };
+
+  $("#clearMemory").onclick=()=>{
+    if(state.memoryTab==="global")state.globalMemory=[];
+    else activeChat().memory=[];
+    saveMemories();
+  };
+
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.remove("show"));
+  [memoryModal,infoModal,installModal,dataModal].forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove("show")});
+
+  input.addEventListener("input",resizeInput);
+  input.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&state.editingMessageId){
+      e.preventDefault();
+      cancelEdit();
+      return;
+    }
+
+    if(e.key==="Enter"&&!e.shiftKey){
+      e.preventDefault();
+      submit();
+    }
+  });
+  send.onclick=()=>submit();
+
+  if(new URLSearchParams(location.search).get("new")==="1"){
+    const c=blankChat();
+    state.chats.push(c);
+    state.activeChatId=c.id;
+    history.replaceState({}, "", location.pathname);
+    persist();
+  }
+
+  renderHistory();
+  renderCurrent();
+  renderMemory();
+  updateStorageStatus();
+
+  if(state.migration?.source && state.migration.count>0){
+    setTimeout(()=>{
+      showToast(`Moved ${state.migration.count} chat${state.migration.count===1?"":"s"} from ${state.migration.source} into permanent Atlas storage`);
+    },900);
+  }
+
+  if(uiStructureOK){
+    bootAtlas();
+  }else{
+    setRailStatus("error");
+  }
+
+  window.addEventListener("beforeunload",()=>{
+    try{ai.postMessage({type:"dispose"})}catch{}
+    URL.revokeObjectURL(workerURL);
+  });
+})();
+</script>
+</body>
+</html>

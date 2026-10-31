@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.log
+.projects-implementation-backup/
+frontend-dist/
+src-tauri/target/
+src-tauri/resources/backend/
+src-tauri/resources/node/node.exe
+migration-data/
+
+.codex-remote-attachments/
+.tauri-updater/
+*.key
+*.key.pub

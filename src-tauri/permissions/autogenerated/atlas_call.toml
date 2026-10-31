@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-atlas-call"
+description = "Enables the atlas_call command without any pre-configured scope."
+commands.allow = ["atlas_call"]
+
+[[permission]]
+identifier = "deny-atlas-call"
+description = "Denies the atlas_call command without any pre-configured scope."
+commands.deny = ["atlas_call"]

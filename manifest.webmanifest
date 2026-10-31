@@ -1,0 +1,37 @@
+{
+  "id": "./",
+  "name": "Atlas",
+  "short_name": "Atlas",
+  "description": "Private local AI powered by Apex 7.3.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "background_color": "#202020",
+  "theme_color": "#202020",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icons/AtlasChat Mobile.png",
+      "sizes": "496x496",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New chat",
+      "short_name": "New chat",
+      "url": "./?new=1",
+      "icons": [
+        {
+          "src": "./icons/AtlasChat Mobile.png",
+          "sizes": "496x496"
+        }
+      ]
+    }
+  ]
+}

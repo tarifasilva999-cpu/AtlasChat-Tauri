@@ -1,0 +1,31 @@
+{
+  "repo": "radames/flux2-klein-edge-web",
+  "revision": "e8f306c29bae4ea18a4d81a3d79507d91e05e94f",
+  "files": [
+    {
+      "path": "te_onnx/model.onnx",
+      "size": 1624096,
+      "sha256": "c0b18bbac959e07c923e984874ca07cedc9c2a3c251706c5281ec7e830c62116"
+    },
+    {
+      "path": "vae_onnx/r320/model.onnx",
+      "size": 422664,
+      "sha256": "d08fdeab4fd19a652ab31702a76d019e46cb49efaf8ae9c7545fbf0fdb75dabd"
+    },
+    {
+      "path": "vae_onnx/r256/model.onnx",
+      "size": 422664,
+      "sha256": "ff7c4bf678622f1963d09af21df1a190ea20227d9dcf78d81c79d62b03d0f1bd"
+    },
+    {
+      "path": "vae_onnx/r128/model.onnx",
+      "size": 422603,
+      "sha256": "0255747a01ee4f4d2c5b462e463f3f3bd3c265255bcc4fff70133d441d4f77e3"
+    },
+    {
+      "path": "vae_onnx/bn_stats.json",
+      "size": 4724,
+      "sha256": "747d34631a5cdcbd709a2abe562e940d69ada439d7d6a03fbca4a6564d194039"
+    }
+  ]
+}

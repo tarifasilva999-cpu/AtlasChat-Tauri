@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Only the packaged Atlas frontend can request allowlisted Atlas operations.",
+  "windows": ["main"],
+  "permissions": ["allow-atlas-call", "core:event:allow-listen", "core:event:allow-unlisten", "updater:default"]
+}

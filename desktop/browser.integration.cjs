@@ -1,0 +1,53 @@
+'use strict';
+// Actual Chromium verification using the same isolated preview engine as Atlas.
+const {app,BrowserWindow,session,protocol}=require('electron');
+const fs=require('node:fs/promises'),syncFs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {ProjectManager}=require('./projects.cjs');
+const {createPreview}=require('./preview.cjs');
+const {bytes}=require('./project-audit.cjs');
+const {Runner}=require('./runner.cjs');
+const {verifyProject,completionStatus}=require('./execution.cjs');
+protocol.registerSchemesAsPrivileged([{scheme:'atlas-preview',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
+const root=syncFs.mkdtempSync(path.join(os.tmpdir(),'atlas-browser-tests-'));
+app.disableHardwareAcceleration();
+app.setPath('userData',path.join(root,'user-data'));
+app.on('window-all-closed',()=>{});
+const timer=setTimeout(()=>{process.stderr.write('Browser integration timeout\n');app.exit(1);},55000);
+app.whenReady().then(async()=>{
+  const manager=new ProjectManager(path.join(root,'projects'));await manager.init();
+  const preview=createPreview({store:manager,session,BrowserWindow,previews:new Map(),MIME:{'.html':'text/html','.js':'text/javascript','.png':'image/png','.css':'text/css'}});
+  const behavior={tests:[{name:'Increment changes the displayed count',steps:[{action:'click',selector:'#add'},{action:'assert',selector:'#count',property:'text',equals:'1'}]}]};
+  const html=script=>'<!doctype html><button id="add">Add</button><output id="count">0</output><script>'+script+'</script>';
+  const execute=async(title,source)=>{
+    console.log('Checking: '+title);
+    const run=await manager.create({title,runtime:'web',entrypoint:'index.html'});await manager.save(run.id,source,0);
+    for(const f of source){const target=path.join(manager.dir(run.id),'work',f.path);await fs.mkdir(path.dirname(target),{recursive:true});await fs.writeFile(target,bytes(f));}
+    return preview(run.id);
+  };
+  const spec={path:'project.tests.json',content:JSON.stringify(behavior)};
+  const pipelineRun=await manager.create({title:'End-to-end',runtime:'web',entrypoint:'index.html'});
+  await manager.save(pipelineRun.id,[{path:'index.html',content:html('document.querySelector("#add").onclick=()=>document.querySelector("#count").textContent="1";')},spec],0);
+  const runner=new Runner(manager,()=>{throw new Error('Static web projects must not download tools.');},()=>{});
+  runner.exec=()=>{throw new Error('Static web projects must not need Docker.');};
+  const pipeline=await verifyProject({store:manager,runner,preview,checking:new Set(),cancelled:new Set()},pipelineRun.id);
+  assert.equal(pipeline.passed,true,JSON.stringify(pipeline));assert.equal(completionStatus(await manager.read(pipelineRun.id)),'checked');
+  assert.equal((await manager.read(pipelineRun.id)).lastSuccessfulBuild.sourceHash,(await manager.read(pipelineRun.id)).sourceHash);
+  console.log('PASS: full audit/run/behavior pipeline without Docker, bound to current source hash');
+  const working=await execute('Working counter',[{path:'index.html',content:html('document.querySelector("#add").onclick=()=>document.querySelector("#count").textContent="1";')},spec]);
+  assert.equal(working.exitCode,0,working.output);assert.equal(working.behaviorVerified,true);console.log('PASS: real button interaction and assertion');
+  const silent=await execute('Silent button',[{path:'index.html',content:html('document.querySelector("#add").onclick=()=>{};')},spec]);
+  assert.equal(silent.exitCode,1);assert.deepEqual(silent.consoleErrors,[]);assert.match(silent.output,/"actual":"0"/);console.log('PASS: silent behavior failure without console errors');
+  const exception=await execute('Runtime exception',[{path:'index.html',content:html('document.querySelector("#add").onclick=()=>{throw new Error("intentional runtime failure")};')},spec]);
+  assert.equal(exception.exitCode,1);assert.ok(exception.consoleErrors.some(e=>e.includes('intentional runtime failure')),exception.output);console.log('PASS: uncaught runtime exception capture');
+  const missing=await execute('Missing image',[{path:'index.html',content:html('document.querySelector("#add").onclick=()=>document.querySelector("#count").textContent="1";')+'<img src="missing.png">'},spec]);
+  assert.equal(missing.exitCode,1);assert.ok(missing.networkErrors.some(e=>e.includes('missing.png')),missing.output);console.log('PASS: network 404 blocks completion');
+  const untested=await execute('Untested page',[{path:'index.html',content:'<!doctype html><h1>Loads without errors</h1>'}]);
+  assert.equal(untested.exitCode,1);assert.equal(untested.behaviorVerified,false);console.log('PASS: a clean load alone never means verified');
+  const imported=await execute('Broken module',[{path:'index.html',content:'<!doctype html><script type="module">import "./nonexistent.js";</script><button id="add">Add</button><output id="count">0</output>'},spec]);
+  assert.equal(imported.exitCode,1);assert.ok(imported.networkErrors.some(e=>e.includes('nonexistent.js')));console.log('PASS: failed module request captured');
+  const startup=await execute('Startup exception',[{path:'index.html',content:html('throw new Error("startup error");')},spec]);
+  assert.equal(startup.exitCode,1);assert.ok(startup.consoleErrors.some(e=>e.includes('startup error')),startup.output);console.log('PASS: exception during initial page startup captured');
+  const screenshotFiles=await fs.readdir(manager.root);assert.ok(screenshotFiles.length>=6);
+  console.log('8 Chromium integration scenarios passed.');
+  clearTimeout(timer);await fs.rm(root,{recursive:true,force:true}).catch(()=>{});app.exit(0);
+}).catch(async e=>{console.error(e);clearTimeout(timer);await fs.rm(root,{recursive:true,force:true}).catch(()=>{});app.exit(1);});
