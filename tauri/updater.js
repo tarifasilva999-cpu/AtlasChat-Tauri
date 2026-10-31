@@ -1,7 +1,7 @@
 import { check } from "@tauri-apps/plugin-updater";
 
-// Enable after the signed update feed and public key are added to tauri.conf.json.
-const UPDATE_FEED_CONFIGURED = false;
+// Signed updates are served from the GitHub Releases endpoint in tauri.conf.json.
+const UPDATE_FEED_CONFIGURED = true;
 const REQUEST_TIMEOUT_MS = 12_000;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let checkInFlight = null;

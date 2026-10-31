@@ -23,6 +23,13 @@
     "publisher": "AtlasAI",
     "icon": ["icons/icon.png"],
     "resources": {"resources/backend/": "backend/", "resources/node/": "node/"},
-    "windows": {"webviewInstallMode": {"type": "skip"}, "nsis": {"installMode": "currentUser"}}
+    "windows": {"webviewInstallMode": {"type": "skip"}, "nsis": {"installMode": "currentUser"}},
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNzc5REQ0MzdENDQ4NkEKUldScVNOUTMxSjEzODEwWXNBeUNwWWlJclhIdmFaRXBTWENHbG0wMmhnT2xDbGJPWTJVdjFYU3cK",
+      "endpoints": ["https://github.com/tarifasilva999-cpu/AtlasChat-Tauri/releases/latest/download/latest.json"]
+    }
   }
 }
