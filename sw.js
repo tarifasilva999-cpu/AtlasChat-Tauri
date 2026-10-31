@@ -1,4 +1,4 @@
-const CACHE = "atlas-chat-native-desktop-v18";
+const CACHE = "atlas-chat-native-desktop-v19";
 const SHELL = [
   "./",
   "./index.html",
@@ -17,6 +17,7 @@ const SHELL = [
   "./icons/AtlasChat Mobile.png",
   "./icons/AtlasPC.png",
   "./icons/WebLogoICON.png",
+  "./icons/Brand/Chat White.png",
   "./icons/Brand/AtlasAI Black.png",
   "./icons/Brand/AtlasAI White.png",
   "./icons/Brand/Brand Black.png",

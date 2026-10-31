@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Atlas</title>
+<title>AtlasChat</title>
 <meta name="description" content="Atlas — private local AI powered by Apex 7.3." />
 <link rel="stylesheet" href="./atlas-ui.css" />
 <link rel="manifest" href="./manifest.webmanifest" />
@@ -26,8 +26,8 @@
         <path d="M9 4v16"/>
       </svg>
     </button>
-    <img class="desktop-window-mark" src="./icons/AtlasPC.png" alt="" />
-    <div class="mobile-brand" aria-hidden="true"><img class="mobile-app-icon" src="./icons/AtlasChat Mobile.png" alt="" /><span>Atlas</span></div>
+    <img class="desktop-window-mark" src="./icons/Brand/Chat White.png" alt="" />
+    <div class="mobile-brand" aria-hidden="true"><img class="mobile-app-icon" src="./icons/Brand/Chat White.png" alt="" /><span>AtlasChat</span></div>
     <div class="workspace-title" id="workspaceTitle">New chat</div>
     <div class="rail-spacer"></div>
     <button class="rail-button" id="headerTheme" aria-label="Change appearance" title="Change appearance"><svg id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button>
@@ -56,7 +56,7 @@
 
   <aside class="sidebar">
     <div class="sidebar-head">
-      <div class="sidebar-title"><img class="sidebar-brand-logo" src="./icons/Brand/AtlasAI White.png" alt="Atlas" /></div>
+      <div class="sidebar-title">AtlasChat</div>
       <button class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">
         <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
       </button>
@@ -165,7 +165,7 @@
       <button class="edit-cancel" id="editCancel" aria-label="Cancel editing" title="Cancel edit">
           <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
         </button>
-        <textarea id="input" rows="1" aria-label="Message Atlas" placeholder="Message Atlas" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mentionMenu"></textarea>
+        <textarea id="input" rows="1" aria-label="Message Atlas" placeholder="Imagine anything" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mentionMenu"></textarea>
     </div>
     <div class="composer-controls">
       <button class="composer-attach" id="attachmentAdd" type="button" aria-label="Attach files" title="Attach files">
@@ -272,7 +272,7 @@
 <div class="scrim" id="infoModal" role="dialog" aria-modal="true" aria-label="About Atlas">
   <section class="panel">
     <div class="panel-head"><h2>About Atlas</h2><button class="panel-close" data-close="infoModal">×</button></div>
-    <img class="about-logo" src="./icons/WebLogoICON.png" alt="" />
+    <img class="about-logo" src="./icons/Brand/Chat White.png" alt="" />
     <h3 class="about-name">Atlas</h3><p class="about-tagline">A private space to think things through.</p>
     <p>Your chats and saved memory live in this browser. Replies are generated on your device. Atlas can make mistakes, so check details that matter.</p>
     <details class="technical-details"><summary>Technical details</summary>
@@ -422,7 +422,7 @@
     $("#railToggle").setAttribute("aria-expanded",String(open));
     $("#railToggle").setAttribute("aria-label",open?"Close conversations":"Open conversations");
   }
-  app.classList.remove("sidebar-open");
+  app.classList.toggle("sidebar-open",!sidebarMedia.matches);
   syncSidebarToggle();
   const sidebarObserver=new MutationObserver(syncSidebarToggle);
   sidebarObserver.observe(app,{attributes:true,attributeFilter:["class"]});
@@ -469,6 +469,8 @@
   const macContinue = $("#macContinue");
   const updateBanner = $("#updateBanner");
   const updateNow = $("#updateNow");
+  let pendingTauriUpdate = null;
+  const updateMessage = updateBanner.querySelector("span");
   const installModal = $("#installModal");
   const dataModal = $("#dataModal");
   const installBtn = $("#installBtn");
@@ -919,7 +921,6 @@
   function setTheme(theme){
     document.documentElement.dataset.theme=theme;
     state.theme=theme;
-    document.querySelectorAll(".sidebar-brand-logo").forEach(logo=>logo.src=theme==="dark"?"./icons/Brand/AtlasAI White.png":"./icons/Brand/AtlasAI Black.png");
     document.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute("content",theme==="dark"?"#202020":"#F7F6F3");
     $("#headerTheme").setAttribute("aria-label",theme==="dark"?"Switch to light appearance":"Switch to dark appearance");
     $("#appearanceLabel").textContent=theme==="dark"?"Dark appearance":"Light appearance";
@@ -1702,6 +1703,16 @@
     updateBanner.classList.add("show");
   }
 
+  window.addEventListener("atlas:tauri-update-available",event=>{
+    const update=event.detail?.update;
+    if(!window.atlasDesktop||!update)return;
+    pendingTauriUpdate=update;
+    updateMessage.textContent="AtlasChat "+update.version+" is ready. The app will close and reopen to finish installing.";
+    updateNow.textContent="Install and restart";
+    updateNow.disabled=false;
+    showUpdateAvailable();
+  });
+
   async function registerServiceWorker(){
     if(window.atlasDesktop||!("serviceWorker" in navigator))return;
 
@@ -1734,7 +1745,38 @@
     }
   }
 
-  updateNow.onclick=()=>{
+  updateNow.onclick=async()=>{
+    if(window.atlasDesktop){
+      if(!pendingTauriUpdate){
+        updateNow.disabled=true;
+        updateNow.textContent="Checking…";
+        try{
+          await window.atlasTauriUpdater?.checkForUpdates();
+        }finally{
+          updateNow.disabled=false;
+          updateNow.textContent=pendingTauriUpdate?"Install and restart":"Retry";
+        }
+        return;
+      }
+
+      const update=pendingTauriUpdate;
+      updateNow.disabled=true;
+      updateNow.textContent="Installing…";
+      try{
+        await update.downloadAndInstall(progress=>{
+          if(progress.event==="Started")updateMessage.textContent="Downloading Atlas "+update.version+"…";
+        });
+      }catch(error){
+        console.error("Atlas update installation failed:",error);
+        try{await update.close();}catch{}
+        pendingTauriUpdate=null;
+        updateMessage.textContent="Could not install the update. Check your connection and retry.";
+        updateNow.disabled=false;
+        updateNow.textContent="Retry";
+      }
+      return;
+    }
+
     const waiting=state.swRegistration?.waiting;
     if(waiting){
       waiting.postMessage({type:"SKIP_WAITING"});
@@ -2699,7 +2741,7 @@
     state.editingMessageId=null;
     clearAttachmentDraft();
     input.value="";
-    input.placeholder="Message Atlas";
+    input.placeholder="Imagine anything";
     composer.classList.remove("editing");
     composer.classList.remove("expanded");
     resizeInput();
@@ -2797,8 +2839,8 @@
     const home=document.createElement("section");
     home.className="new-chat-home"+(isMobileUI()?" mobile-home":"");
     home.innerHTML=`
-      <img class="home-icon" src="./icons/WebLogoICON.png" alt="" />
-      <h1>What’s on your <em>mind?</em></h1>
+      <img class="home-icon" src="./icons/Brand/Chat White.png" alt="" />
+      <h1><em>What will you imagine today?</em></h1>
       <p>A question, a rough idea, a place to start.</p>
       <div class="new-chat-prompts">
         <button class="new-chat-prompt" data-prompt="Help me think through an idea for ">Explore an idea</button>
@@ -3961,7 +4003,7 @@ Local date/time: ${current}.${global}${local}`
       state.editingMessageId=null;
       input.value="";
       saveMobileDraft();
-      input.placeholder="Message Atlas";
+      input.placeholder="Imagine anything";
       composer.classList.remove("editing");
       composer.classList.remove("expanded");
       clearAttachmentDraft();
@@ -4829,7 +4871,7 @@ Local date/time: ${current}.${global}${local}`
       button.hidden=((mobile||limitedPC)&&largeChoice)||(Boolean(backgroundChoice)&&!allowedWhileBackground.has(choice));
       button.disabled=Boolean((state.generating&&state.pendingChatId===state.activeChatId)||(secondaryJob?.chatId===state.activeChatId));
     });
-    input.placeholder=imageMode?"Describe the image you want…":"Work with Atlas";
+    input.placeholder=imageMode?"Describe the image you want…":"Imagine anything";
     document.querySelectorAll("[data-model-choice]").forEach(button=>{
       const selected=imageMode?button.dataset.modelChoice==="poem3":button.dataset.modelChoice===state.modelChoice;
       button.setAttribute("aria-pressed",String(selected));button.classList.toggle("selected",selected);

@@ -9,3 +9,5 @@ Before the first release:
 3. Bump the version in `src-tauri/tauri.conf.json`, commit and push the change, then push the matching tag, such as `v0.1.1`.
 
 The workflow checks that the tag matches the app version, builds the signed NSIS installer, and publishes it to GitHub Releases. Install the first updater-enabled build manually; later releases can be offered in-app.
+
+Windows updates use the passive NSIS installer. When the user selects Install and restart, AtlasChat exits and the installer reopens it after installation. A new signed release and matching tag are required for existing installations to receive an update; pushing source alone does not publish one.
