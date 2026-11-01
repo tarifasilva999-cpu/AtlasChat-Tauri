@@ -73,6 +73,9 @@ test('a failed check repairs source and reruns, while snippets remain quick', as
   assert.equal(env.coding.shouldRun('Build a Python project'), true);
   assert.equal(env.coding.shouldRun('Explain Python code'), false);
   assert.equal(env.coding.shouldRun('Show a small snippet'), false);
+  env.chat.projectId='existing-project';
+  assert.equal(env.coding.shouldRun('Brainstorm how we could implement this, without changing files'),false);
+  env.chat.projectId=null;
   await env.coding.run('Build a Python project');
   const message = env.chat.messages.at(-1), run = await env.store.read(message.projectRunId);
   assert.equal(env.checks(), 2, env.chat.messages.at(-1).content);
@@ -112,8 +115,12 @@ test('follow-up chat reuses the canonical workspace and stops repeated repair ev
   assert.equal(env.checks(),2);
   assert.equal(run.tasks[0].metrics.repairAttempts,1);
   assert.ok(run.events.some(e=>e.text.includes('Repeated failure')));
+  const shared=JSON.parse(await env.coding.projectContextForChat(env.chat.id,'Build a Python project'));
+  assert.match(shared.recentProjectWork,/Build a Python project/);
+  assert.ok(run.tasks[0].events.some(event=>event.stage==='Planning'));
   env.chat.messages.push({role:'user',content:'Make output brighter'});
   assert.equal(env.coding.shouldRun('Make output brighter'),true);
+  assert.equal(env.coding.shouldRun('Yes, go ahead'),true);
   await env.coding.run('Change text color');
   assert.equal(env.chat.projectId,id);
   assert.equal((await env.store.ids()).length,1);

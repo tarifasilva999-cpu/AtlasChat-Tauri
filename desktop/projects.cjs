@@ -61,22 +61,101 @@ function commandPlan(source, run) {
   return result;
 }
 class ProjectManager extends Store {
-  constructor(root) { super(root); this.locks = new Map(); this.indexes = new Map(); }
+  constructor(root) { super(root); this.locks = new Map(); this.indexes = new Map(); this.executing = new Set(); }
+  workspace(id) { return path.join(this.dir(id), 'workspace'); }
+  async readWorkspace(id, run) {
+    const root = this.workspace(id), known = new Map((run.files || []).map(file => [file.path, file]));
+    const source = [], directories = [], generated = new Set(['node_modules', '.venv', '.git', '__pycache__']);
+    let total = 0;
+    const visit = async (dir, prefix = '') => {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const relative = prefix ? prefix + '/' + entry.name : entry.name;
+        if (entry.isDirectory() && generated.has(entry.name.toLowerCase())) continue;
+        if (entry.isDirectory() && ['dist', 'build', 'coverage', '.cache'].includes(entry.name.toLowerCase()) &&
+            ![...known.keys()].some(name => name.startsWith(relative + '/')) && !(run.directories || []).some(name => name === relative || name.startsWith(relative + '/'))) continue;
+        projectPath(relative);
+        if (entry.isSymbolicLink()) throw new Error('Project workspace contains a symbolic link: ' + relative);
+        if (entry.isDirectory()) { directories.push(relative); await visit(path.join(dir, entry.name), relative); continue; }
+        if (!entry.isFile()) throw new Error('Unsupported project workspace entry: ' + relative);
+        const stat = await fs.stat(path.join(dir, entry.name));
+        total += stat.size;
+        if (stat.size > LIMITS.fileBytes || total > LIMITS.totalBytes || source.length >= LIMITS.files) throw new Error('Workspace size limit exceeded: ' + relative);
+        const buffer = await fs.readFile(path.join(dir, entry.name)), decoded = buffer.toString('utf8');
+        const binary = !!known.get(relative)?.binary || buffer.includes(0) || !Buffer.from(decoded).equals(buffer) ||
+          (!known.has(relative) && /\.(?:png|jpe?g|gif|webp|woff2?|mp3|mp4|wav|wasm|ico)$/i.test(relative));
+        source.push({ path: relative, content: binary ? buffer.toString('base64') : decoded, ...(binary ? { encoding: 'base64' } : {}) });
+      }
+    };
+    await visit(root);
+    const order = new Map((run.files || []).map((file, index) => [file.path, index]));
+    source.sort((a,b) => (order.get(a.path) ?? Infinity) - (order.get(b.path) ?? Infinity) || a.path.localeCompare(b.path));
+    const explicit = (run.directories || []).filter(dir => directories.includes(dir));
+    for (const dir of directories) if (!source.some(file => file.path.startsWith(dir + '/')) && !explicit.includes(dir)) explicit.push(dir);
+    return { source: validateFiles(source), directories: explicit };
+  }
+  async writeWorkspace(id, state) {
+    const root = this.dir(id), target = this.workspace(id), stage = path.join(root, 'workspace.next'), previous = path.join(root, 'workspace.previous');
+    await fs.rm(stage, { recursive: true, force: true });
+    await fs.mkdir(stage, { recursive: true });
+    for (const directory of state.run.directories || []) await fs.mkdir(path.join(stage, projectPath(directory)), { recursive: true });
+    for (const file of state.source) {
+      const dest = path.join(stage, projectPath(file.path));
+      await fs.mkdir(path.dirname(dest), { recursive: true }); await fs.writeFile(dest, bytes(file));
+    }
+    await fs.rm(previous, { recursive: true, force: true });
+    let moved = false;
+    try {
+      try { await atomicRename(target, previous); moved = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      await atomicRename(stage, target);
+    } catch (error) {
+      if (moved) await atomicRename(previous, target).catch(() => {});
+      throw error;
+    }
+    await fs.rm(previous, { recursive: true, force: true });
+  }
   async locked(id, fn) {
     runId(id); const before = this.locks.get(id) || Promise.resolve();
     const next = before.catch(() => {}).then(fn); this.locks.set(id, next);
     try { return await next; } finally { if (this.locks.get(id) === next) this.locks.delete(id); }
   }
-  async state(id) {
+  async state(id) { return this.locked(id, () => this._state(id)); }
+  async _state(id) {
     try {
       const saved=JSON.parse(await fs.readFile(path.join(this.dir(id), 'workspace.json'), 'utf8'));
       if(Array.isArray(saved.source)){
         saved.run.archiveHash=null;saved.run.checkpointFormat=2;
         await this.migrateCheckpoints(id,saved.run);await this.commit(id,saved);return saved;
       }
-      const archive=await fs.readFile(path.join(this.dir(id),'project.zip'));
-      const {source}=sourceFromZip(archive,saved.run.files||[]);
+      let source,archiveFailed=false;
+      try { const archive=await fs.readFile(path.join(this.dir(id),'project.zip')); source=sourceFromZip(archive,saved.run.files||[]).source; }
+      catch(error) { if(saved.run.workspaceFormat!==1 || this.executing.has(id))throw error;archiveFailed=true; }
       if((saved.run.checkpointFormat||0)<2){await this.migrateCheckpoints(id,saved.run);saved.run.checkpointFormat=2;await this.commit(id,{run:saved.run,source});}
+      if (saved.run.workspaceFormat === 1) {
+        const target=this.workspace(id), previous=path.join(this.dir(id),'workspace.previous');
+        try { await fs.access(target); } catch (error) {
+          if(error.code!=='ENOENT')throw error;
+          try { await fs.rename(previous,target); } catch (restoreError) { if(restoreError.code==='ENOENT')throw new Error('Project workspace is missing. Restore it from an Atlas backup.');throw restoreError; }
+        }
+        if (!this.executing.has(id)) {
+          const disk=await this.readWorkspace(id,saved.run);
+          if(archiveFailed){source=disk.source;saved.run.archiveHash=null;}
+          const state={run:saved.run,source};
+          if (fingerprint(disk.source)!==saved.run.sourceHash || fingerprint(disk.directories)!==fingerprint(saved.run.directories||[])) {
+            const oldRevision=saved.run.revision;
+            saved.run.directories=disk.directories; await this.replace(state,disk.source,{});
+            if (saved.run.revision===oldRevision) {
+              saved.run.revision++; saved.run.sourceHash=fingerprint(disk.source); saved.run.lastCheck=null; saved.run.status='incomplete';
+              saved.run.files=disk.source.map(f=>({path:f.path,bytes:bytes(f).length,hash:fingerprint(f),binary:f.encoding==='base64'}));
+              saved.run.commands={...commandPlan(disk.source,saved.run),...saved.run.commandOverrides}; saved.run.updated=Date.now();
+              saved.run.history.push({at:Date.now(),revision:saved.run.revision,taskId:null,chatId:null,changes:[],checkpoint:null});
+              saved.run.history=saved.run.history.slice(-100);
+            }
+            saved.run.workspaceHash=fingerprint({source:disk.source,directories:disk.directories});
+            await this.commit(id,state);
+          } else if(archiveFailed) await this.commit(id,state);
+          source=disk.source;
+        }
+      } else { await this.commit(id,{run:saved.run,source}); }
       return {run:saved.run,source};
     }
     catch (e) {
@@ -104,6 +183,10 @@ class ProjectManager extends Store {
   }
   async commit(id, state) {
     const archiveHash = fingerprint({source:state.source,directories:state.run.directories||[]});
+    if (state.run.workspaceFormat !== 1 || state.run.workspaceHash !== archiveHash) {
+      await this.writeWorkspace(id, state);
+      state.run.workspaceFormat = 1; state.run.workspaceHash = archiveHash;
+    }
     if (state.run.archiveHash !== archiveHash) {
       const {zipSync}=require('fflate');
       const entries=Object.fromEntries(state.source.map(f=>[f.path,bytes(f)]));
@@ -129,22 +212,26 @@ class ProjectManager extends Store {
   async source(id) { return (await this.state(id)).source; }
   async put(run) {
     return this.locked(run.id, async () => {
-      const state = await this.state(run.id);
+      const state = await this._state(run.id);
       if ((run.revision ?? 0) !== state.run.revision) throw new Error('REVISION_CONFLICT: re-read current project.');
       state.run = run; await this.commit(run.id, state);
     });
   }
   async event(id, event) {
     return this.locked(id, async () => {
-      const state = await this.state(id);
-      state.run.events.push({ at: Date.now(), stage: String(event.stage || '').slice(0,40), text: String(event.text || '').slice(0,16000),
-        sources: (Array.isArray(event.sources) ? event.sources : []).slice(0,5).filter(s => /^https:\/\//.test(s.url)).map(s => ({ title: String(s.title).slice(0,180), url: String(s.url).slice(0,2048) })) });
+      const state = await this._state(id);
+      const task=state.run.tasks.find(t=>t.id===event.taskId) || (!event.taskId && state.run.tasks.find(t=>t.status==='working'));
+      const item={ at: Date.now(), stage: String(event.stage || '').slice(0,40), text: String(event.text || '').slice(0,16000),
+        ...(task?{taskId:task.id,chatId:task.chatId}:{}),
+        sources: (Array.isArray(event.sources) ? event.sources : []).slice(0,5).filter(s => /^https:\/\//.test(s.url)).map(s => ({ title: String(s.title).slice(0,180), url: String(s.url).slice(0,2048) })) };
+      state.run.events.push(item);
+      if(task){task.events=[...(task.events||[]),{...item,text:item.text.slice(0,4000)}].slice(-80);}
       state.run.events = state.run.events.slice(-120); await this.commit(id, state); return state.run;
     });
   }
   async save(id, value, expectedRevision, actor = {}) {
     return this.locked(id, async () => {
-      const state = await this.state(id);
+      const state = await this._state(id);
       if (expectedRevision !== undefined && expectedRevision !== state.run.revision) throw new Error('REVISION_CONFLICT: workspace changed; re-read before editing.');
       await this.replace(state, validateFiles(value), actor); await this.commit(id, state); return state.run;
     });
@@ -180,7 +267,7 @@ class ProjectManager extends Store {
       const results = []; for (const c of args.commands) results.push(await this.command({ id, chatId, taskId, ...c })); return { results };
     }
     return this.locked(id, async () => {
-      const state = await this.state(id), { run, source } = state, index = this.index(id, source);
+      const state = await this._state(id), { run, source } = state, index = this.index(id, source);
       const task = run.tasks.find(t => t.id === taskId);
       const limit = Math.max(100, Math.min(Number(args.limit) || LIMITS.output, 12000));
       let result;
@@ -238,7 +325,7 @@ class ProjectManager extends Store {
           result = await mutate(source.map(s => s === f ? {...f,content:f.content.replace(args.search,() => args.replace)} : s)); break;
         }
         case 'DELETE_FILE': { const f = file(); if (args.baseHash !== fingerprint(f)) throw new Error('HASH_CONFLICT'); result = await mutate(source.filter(s => s !== f)); break; }
-        case 'MOVE_FILE': case 'RENAME_FILE': { const f=file(), target=projectPath(args.to); if (source.some(s => s.path.toLowerCase() === target.toLowerCase())) throw new Error('FILE_EXISTS'); result=await mutate(source.map(s => s===f ? {...f,path:target} : s)); break; }
+        case 'MOVE_FILE': case 'RENAME_FILE': { const f=file(), target=projectPath(args.to); if (args.baseHash !== fingerprint(f)) throw new Error('HASH_CONFLICT: re-read the file.'); if (source.some(s => s.path.toLowerCase() === target.toLowerCase())) throw new Error('FILE_EXISTS'); result=await mutate(source.map(s => s===f ? {...f,path:target} : s)); break; }
         case 'CREATE_DIRECTORY': revision(); if(source.some(f=>f.path.toLowerCase()===String(args.path).toLowerCase()))throw new Error('FILE_EXISTS');run.directories = [...new Set([...run.directories, projectPath(args.path)])]; run.revision++; result={revision:run.revision}; break;
         case 'CHECK_SYNTAX': case 'VALIDATE_REFERENCES': case 'VALIDATE_ASSETS': case 'AUDIT': {
           const checked = audit(source,run,index); result={...checked,errors:checked.errors.slice(0,12)}; break;
@@ -270,6 +357,28 @@ class ProjectManager extends Store {
           result=checkpoint;break;
         }
         case 'LIST_CHECKPOINTS': result={checkpoints:run.checkpoints};break;
+        case 'DIFF_CHECKPOINT': {
+          const checkpoint=run.checkpoints.find(item=>item.id===args.checkpointId);if(!checkpoint)throw new Error('Checkpoint missing.');
+          const base=path.join(this.dir(id),'checkpoints',runId(checkpoint.id));
+          const saved=JSON.parse(await fs.readFile(base+'.json','utf8'));
+          const before=sourceFromZip(await fs.readFile(base+'.zip'),saved.files||[]).source;
+          const old=new Map(before.map(item=>[item.path,item])),current=new Map(source.map(item=>[item.path,item]));
+          const changed=[...new Set([...old.keys(),...current.keys()])].filter(file=>!old.has(file)||!current.has(file)||fingerprint(old.get(file))!==fingerprint(current.get(file)));
+          let remaining=12000;const changes=[];
+          for(const file of changed.slice(0,30)){
+            const a=old.get(file),b=current.get(file),kind=!a?'Added':!b?'Deleted':'Modified';
+            if(a?.encoding==='base64'||b?.encoding==='base64'){changes.push({path:file,kind,binary:true,diff:'Binary file changed.'});continue;}
+            const left=a?a.content.split('\n'):[],right=b?b.content.split('\n'):[];let start=0,end=0;
+            while(start<left.length&&start<right.length&&left[start]===right[start])start++;
+            while(end<left.length-start&&end<right.length-start&&left[left.length-1-end]===right[right.length-1-end])end++;
+            const removed=left.slice(start,Math.min(left.length-end,start+40)),added=right.slice(start,Math.min(right.length-end,start+40));
+            const lines=['@@ line '+(start+1)+' @@',...removed.map(line=>'- '+line.slice(0,500)),...added.map(line=>'+ '+line.slice(0,500))];
+            const raw=lines.join('\n'),allowed=Math.max(0,Math.min(2400,remaining));remaining-=Math.min(raw.length,allowed);
+            changes.push({path:file,kind,diff:raw.slice(0,allowed),truncated:raw.length>allowed||left.length-end-start>removed.length||right.length-end-start>added.length||[...removed,...added].some(line=>line.length>500)});
+            if(remaining<=0)break;
+          }
+          result={checkpoint:{id:checkpoint.id,label:checkpoint.label},changes,truncated:changes.length<changed.length};break;
+        }
         case 'ROLLBACK': {
           revision(); const checkpoint=run.checkpoints.find(c=>c.id===args.checkpointId);if(!checkpoint)throw new Error('Checkpoint missing.');
           const saved=JSON.parse(await fs.readFile(path.join(this.dir(id),'checkpoints',checkpoint.id+'.json'),'utf8'));
@@ -293,7 +402,7 @@ class ProjectManager extends Store {
         }
         case 'START_TASK': {
           if(run.tasks.some(t=>t.status==='working'))throw new Error('PROJECT_BUSY: finish the active task first.');
-          const level=complexity(String(args.request || ''),Number(args.fileCount)||0),t={id:crypto.randomUUID(),chatId,request:String(args.request||'').slice(0,1800),complexity:level,policy:POLICIES[level],status:'working',at:Date.now(),evidence:[],metrics:{modelCalls:0,inputChars:0,outputChars:0,contextChars:0,filesRead:0,filesChanged:0,buildAttempts:0,repairAttempts:0,researchCalls:0}};
+          const level=complexity(String(args.request || ''),Number(args.fileCount)||0),t={id:crypto.randomUUID(),chatId,request:String(args.request||'').slice(0,1800),complexity:level,policy:POLICIES[level],status:'working',at:Date.now(),evidence:[],events:[],metrics:{modelCalls:0,inputChars:0,outputChars:0,contextChars:0,filesRead:0,filesChanged:0,buildAttempts:0,repairAttempts:0,researchCalls:0}};
           run.tasks.push(t);run.tasks=run.tasks.slice(-50);run.status='working';run.lastCheck=null;result=t;break;
         }
         case 'RECORD_CALL': {
@@ -312,7 +421,7 @@ class ProjectManager extends Store {
           if(!task||task.metrics.researchCalls>=task.policy.research||!task.metrics.repairAttempts||!String(args.question||'').trim())result={allowed:false};
           else {task.metrics.researchCalls++;result={allowed:true};}break;
         }
-        case 'FINISH_TASK': if(task){task.status=String(args.status||'incomplete');task.elapsedMs=Date.now()-task.at;}result={saved:true};break;
+        case 'FINISH_TASK': if(task){task.status=String(args.status||'incomplete');task.elapsedMs=Date.now()-task.at;task.result=run.lastCheck?{passed:!!run.lastCheck.passed,executed:!!run.lastCheck.executed,reason:String(run.lastCheck.reason||'').slice(0,500),sourceHash:run.lastCheck.sourceHash}:null;}result={saved:true};break;
         case 'ATTACH_CHAT': if(typeof chatId!=='string'||chatId.length>100)throw new Error('Invalid chat ID.');run.chats=[...new Set([...run.chats,chatId])];result={chats:run.chats};break;
         case 'DETACH_CHAT': if(typeof chatId!=='string'||chatId.length>100)throw new Error('Invalid chat ID.');run.chats=run.chats.filter(id=>id!==chatId);result={chats:run.chats};break;
         case 'GET_BUILD_OUTPUT': case 'GET_RUNTIME_OUTPUT': case 'GET_CONSOLE_ERRORS': case 'GET_NETWORK_ERRORS': result={checks:(run.lastCheck?.checks||[]).filter(c => name==='GET_BUILD_OUTPUT'||name==='GET_RUNTIME_OUTPUT'||(name==='GET_CONSOLE_ERRORS'?c.consoleErrors?.length:c.networkErrors?.length)).map(c=>({...c,output:String(c.output||'').slice(-limit)})).slice(-8)};break;
@@ -323,7 +432,7 @@ class ProjectManager extends Store {
   }
   async remove(id) {
     return this.locked(id, async () => {
-      const run = await this.read(id);
+      const run = (await this._state(id)).run;
       if (run.status === 'working' || run.tasks.some(task => task.status === 'working')) throw new Error('Finish or stop the active project task before deleting.');
       const root = path.resolve(this.root), target = path.resolve(this.dir(id));
       if (path.dirname(target) !== root) throw new Error('Invalid project directory.');
@@ -333,11 +442,11 @@ class ProjectManager extends Store {
     });
   }
   async list() { const result=[];for(const id of await this.ids()){const r=await this.read(id);result.push({id,title:r.title,status:r.status,revision:r.revision,chats:r.chats,updated:r.updated||r.created});}return result.sort((a,b)=>b.updated-a.updated); }
-  async recover() { await super.recover();for(const id of await this.ids())await this.locked(id,async()=>{const s=await this.state(id);for(const t of s.run.tasks)if(t.status==='working')t.status='interrupted';await this.commit(id,s);}); }
+  async recover() { await super.recover();for(const id of await this.ids())await this.locked(id,async()=>{const s=await this._state(id);for(const t of s.run.tasks)if(t.status==='working')t.status='interrupted';await this.commit(id,s);}); }
   async importZip(data, title) {
     const {source,directories}=sourceFromZip(data);
     if(!source.length)throw new Error('ZIP contains no files.');const run=await this.create({title,...detect(source)});await this.save(run.id,source,0);const imported=await this.read(run.id);imported.directories=directories;await this.put(imported);return this.read(run.id);
   }
-  async zip(id) { const archivePath=path.join(this.dir(id),'project.zip');try{return await fs.readFile(archivePath);}catch(e){if(e.code!=='ENOENT')throw e;const {run,source}=await this.state(id);const {zipSync}=require('fflate');const entries=Object.fromEntries(source.map(f=>[f.path,bytes(f)]));for(const d of run.directories||[])entries[d+'/']=new Uint8Array();return zipSync(entries,{level:6});} }
+  async zip(id) { return this.locked(id,async()=>{await this._state(id);return fs.readFile(path.join(this.dir(id),'project.zip'));}); }
 }
 module.exports={ProjectManager,validateFiles,validateCommands,detect,complexity,sourceFromZip,POLICIES,LIMITS};

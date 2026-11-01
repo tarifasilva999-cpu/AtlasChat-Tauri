@@ -1,7 +1,7 @@
 'use strict';
 
-// Compute a unique, increasing patch version for a main-branch commit. The
-// checked-in version supplies the major/minor line and minimum patch number.
+// Compute a unique patch version within the current checked-in version line.
+// A commit that changes the checked-in version uses that version exactly.
 // The generated version exists only in the CI checkout used for this build.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,10 +11,16 @@ const RELEASE_BASE = '33c8df9968f12e57a76b76306b66e55ac9674647';
 
 function releaseVersion(base, count) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(base);
-  if (!match || !Number.isSafeInteger(count) || count < 1) throw Error('Expected a numeric app version and a positive commit count.');
+  if (!match || !Number.isSafeInteger(count) || count < 0) throw Error('Expected a numeric app version and a nonnegative commit count.');
   const patch = Number(match[3]) + count;
   if (patch > 65535) throw Error('Release patch exceeds the Windows version limit; advance the minor version.');
   return `${Number(match[1])}.${Number(match[2])}.${patch}`;
+}
+function commitsSinceVersionChange(versions) {
+  if (!Array.isArray(versions) || !versions.length) throw Error('Missing version history.');
+  let lastChange=0;
+  for(let i=1;i<versions.length;i++)if(versions[i]!==versions[i-1])lastChange=i;
+  return versions.length-1-lastChange;
 }
 function applyVersion(root, version) {
   for (const name of ['package.json', 'package-lock.json', 'src-tauri/tauri.conf.json']) {
@@ -36,11 +42,14 @@ if (require.main === module) {
   const root = process.cwd();
   const base = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8')).version;
   execFileSync('git', ['merge-base', '--is-ancestor', RELEASE_BASE, 'HEAD']);
-  const count = Number(execFileSync('git', ['rev-list', '--first-parent', '--count', `${RELEASE_BASE}..HEAD`], { encoding: 'utf8' }).trim());
+  const commits=execFileSync('git',['rev-list','--first-parent','--reverse',`${RELEASE_BASE}..HEAD`],{encoding:'utf8'}).trim().split(/\s+/).filter(Boolean);
+  if(!commits.length)throw Error('No new main-branch commit to release.');
+  const versions=[RELEASE_BASE,...commits].map(commit=>JSON.parse(execFileSync('git',['show',`${commit}:src-tauri/tauri.conf.json`],{encoding:'utf8'})).version);
+  const count=commitsSinceVersionChange(versions);
   const version = releaseVersion(base, count);
   applyVersion(root, version);
   if (!process.env.GITHUB_OUTPUT) throw Error('GITHUB_OUTPUT is required for the release workflow.');
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\ntag=v${version}\n`);
   console.log(`Building AtlasChat ${version} for commit ${process.env.GITHUB_SHA || 'HEAD'}.`);
 }
-module.exports = { releaseVersion, applyVersion };
+module.exports = { releaseVersion, commitsSinceVersionChange, applyVersion };

@@ -38,6 +38,8 @@ test('checkpoints restore source and shared decisions, invalidating verification
   await cmd('SET_PROJECT_MEMORY',{baseRevision:1,memory:{decision:'canonical'}});
   const cp=await cmd('CHECKPOINT',{label:'Known working'});
   await manager.save(run.id,[{path:'index.html',content:'bad'}],2);
+  const diff=await cmd('DIFF_CHECKPOINT',{checkpointId:cp.id});
+  assert.equal(diff.changes[0].path,'index.html');assert.match(diff.changes[0].diff,/- old/);assert.match(diff.changes[0].diff,/\+ bad/);
   await cmd('ROLLBACK',{baseRevision:3,checkpointId:cp.id});
   assert.equal((await manager.source(run.id))[0].content,'old');
   assert.equal((await manager.read(run.id)).memory.decision,'canonical');
@@ -96,6 +98,38 @@ test('legacy runs migrate to Projects without copying or losing source',async t=
   await legacy.save(run.id,[{path:'main.py',content:'print(1)'}]);const manager=new ProjectManager(root);
   const current=await manager.read(run.id);assert.equal(current.version,3);await manager.command({id:run.id,name:'CHECKPOINT'});
   assert.equal((await manager.source(run.id))[0].content,'print(1)');assert.equal((await manager.read(run.id)).id,run.id);
+});
+test('ZIP-backed projects migrate into a persistent workspace and export its current files',async t=>{
+  const {manager,run,root}=await setup(t);await manager.save(run.id,[{path:'src/main.js',content:'old'}],0);
+  const metadataPath=path.join(manager.dir(run.id),'workspace.json');
+  const metadata=JSON.parse(await fs.readFile(metadataPath,'utf8'));delete metadata.run.workspaceFormat;delete metadata.run.workspaceHash;
+  await fs.writeFile(metadataPath,JSON.stringify(metadata));await fs.rm(manager.workspace(run.id),{recursive:true});
+  const reopened=new ProjectManager(root),migrated=await reopened.read(run.id);
+  assert.equal(migrated.workspaceFormat,1);assert.equal(await fs.readFile(path.join(reopened.workspace(run.id),'src','main.js'),'utf8'),'old');
+  await fs.writeFile(path.join(reopened.workspace(run.id),'src','main.js'),'new');
+  const changed=await reopened.read(run.id);assert.equal(changed.revision,migrated.revision+1);assert.equal(changed.lastCheck,null);
+  assert.equal(Buffer.from(unzipSync(await reopened.zip(run.id))['src/main.js']).toString(),'new');
+  assert.equal((await new ProjectManager(root).source(run.id))[0].content,'new');
+  await fs.rm(path.join(reopened.dir(run.id),'project.zip'));
+  assert.equal((await reopened.source(run.id))[0].content,'new');
+  assert.equal(Buffer.from(unzipSync(await reopened.zip(run.id))['src/main.js']).toString(),'new');
+  const binary=Buffer.from([0,255,42]);await fs.writeFile(path.join(reopened.workspace(run.id),'src','main.js'),binary);
+  assert.equal((await reopened.source(run.id))[0].encoding,'base64');
+  assert.deepEqual(Buffer.from(unzipSync(await reopened.zip(run.id))['src/main.js']),binary);
+});
+test('runtime writes are reconciled after execution and task transcripts remain separate',async t=>{
+  const {manager,run,cmd}=await setup(t);await manager.save(run.id,[{path:'main.py',content:'old'}],0);
+  const task=await cmd('START_TASK',{request:'Change the project'},{chatId:'chat-a'});
+  manager.executing.add(run.id);await fs.writeFile(path.join(manager.workspace(run.id),'main.py'),'new');
+  await manager.event(run.id,{stage:'Command',text:'python main.py\nExit: 0',taskId:task.id});
+  assert.equal((await manager.source(run.id))[0].content,'old');
+  manager.executing.delete(run.id);
+  const changed=await manager.read(run.id);assert.equal(changed.revision,2);assert.equal((await manager.source(run.id))[0].content,'new');
+  assert.equal(changed.tasks[0].events[0].stage,'Command');
+  await cmd('FINISH_TASK',{status:'incomplete'},{taskId:task.id});
+  const next=await cmd('START_TASK',{request:'Another task'},{chatId:'chat-b'});
+  await manager.event(run.id,{stage:'Planning',text:'Inspect first',taskId:next.id});
+  const tasks=(await manager.read(run.id)).tasks;assert.deepEqual(tasks.map(item=>item.events.map(event=>event.stage)),[['Command'],['Planning']]);
 });
 test('completion requires behavior evidence tied to the exact current source',async()=>{
   const {completionStatus}=require('./execution.cjs');const run={sourceHash:'current',lastCheck:{passed:true,sourceHash:'current'}};

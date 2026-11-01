@@ -123,6 +123,15 @@ jobs:
         id: version
         run: node .release-automation/scripts/commit-release-version.cjs
 
+      - name: Use commit description as release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $delimiter = [guid]::NewGuid().ToString()
+          "body<<$delimiter" >> $env:GITHUB_OUTPUT
+          git log -1 --format=%B >> $env:GITHUB_OUTPUT
+          "$delimiter" >> $env:GITHUB_OUTPUT
+
       - name: Install JavaScript dependencies
         run: npm ci
 
@@ -135,7 +144,7 @@ jobs:
         with:
           tagName: ${{ steps.version.outputs.tag }}
           releaseName: AtlasChat ${{ steps.version.outputs.tag }}
-          releaseBody: 'Windows release for commit ${{ matrix.commit }}.'
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseCommitish: ${{ matrix.commit }}
           releaseDraft: false
           projectPath: .

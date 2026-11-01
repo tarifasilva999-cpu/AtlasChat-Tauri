@@ -69,7 +69,7 @@ function dependencyPlan(source, runtime) {
     return name + '@' + version;
   });
   if (!packages.length) return null;
-  return { packages, commands: [['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org']] };
+  return { packages, commands: [['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', '--package-lock=false', '--registry=https://registry.npmjs.org']] };
 }
 class Store {
   constructor(root) { this.root = root; }

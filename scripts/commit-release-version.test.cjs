@@ -3,10 +3,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { releaseVersion, applyVersion } = require('./commit-release-version.cjs');
+const { releaseVersion, commitsSinceVersionChange, applyVersion } = require('./commit-release-version.cjs');
 
 test('each main commit has a higher valid Windows release version', () => {
   assert.equal(releaseVersion('1.0.0', 1), '1.0.1');
+  assert.equal(releaseVersion('2.0.0', 0), '2.0.0');
+  assert.equal(commitsSinceVersionChange(['1.0.0','1.0.0','2.0.0']), 0);
+  assert.equal(commitsSinceVersionChange(['1.0.0','2.0.0','2.0.0']), 1);
   assert.equal(releaseVersion('1.0.0', 2), '1.0.2');
   assert.equal(releaseVersion('1.1.2', 2), '1.1.4');
   assert.throws(() => releaseVersion('1.0.0-rc1', 18));

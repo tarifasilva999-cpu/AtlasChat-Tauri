@@ -80,12 +80,17 @@ class Runner {
     job.container = name;
     const uid = typeof process.getuid === 'function' ? process.getuid() || 65534 : 1000;
     const gid = typeof process.getgid === 'function' ? process.getgid() || 65534 : 1000;
+    const environment=path.join(this.store.dir(job.id),'environment');
+    await fs.mkdir(path.join(environment,'node_modules'),{recursive:true});
+    await fs.mkdir(path.join(environment,'venv'),{recursive:true});
     const result = await this.exec([
       'run', '--rm', '--pull=never', '--name', name, '--network', network ? 'bridge' : 'none',
       '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
       '--pids-limit=128', '--memory=2g', '--memory-swap=2g', '--cpus=2',
       '--user', uid + ':' + gid, '--tmpfs', '/tmp:rw,nosuid,nodev,size=512m',
       '--volume', work + ':/workspace:rw',
+      '--volume', path.join(environment,'node_modules') + ':/workspace/node_modules:rw',
+      '--volume', path.join(environment,'venv') + ':/workspace/.venv:rw',
       '--workdir', '/workspace', '--env', 'HOME=/tmp', '--env', 'CI=true',
       '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'PIP_INDEX_URL=https://pypi.org/simple',
       image, ...args
@@ -93,7 +98,7 @@ class Runner {
     job.container = null;
     // Covers CLI crashes and timeouts where --rm did not get a chance to run.
     if (result.timedOut || result.cancelled || result.exitCode === -1) this.removeContainer(name);
-    await this.publish(job.id, 'Command', args.join(' ') + '\nExit: ' + result.exitCode +
+    await this.publish(job.id, 'Command', args.join(' ') + '\nWorking directory: /workspace\nExit: ' + result.exitCode +
       (result.timedOut ? ' (time limit)' : '') + '\n' + result.output);
     if (job.cancelled) throw new Error('Run stopped.');
     return { command: args.join(' '), executed: true, ...result };
@@ -107,6 +112,7 @@ class Runner {
       const run = await this.store.read(id); const source = await this.store.source(id);
       if (!source.length) throw new Error('There are no completed files to run.');
       result.sourceHash = fingerprint(source);
+      this.store.executing?.add(id);
       const staticResult = audit(source, run, this.store.index(id, source));
       result.audit = staticResult;
       result.checks.push({ command: 'Static audit', executed: true, exitCode: staticResult.passed ? 0 : 1,
@@ -125,12 +131,6 @@ class Runner {
       const work = await this.prepareWork(id,source);
       const deps = dependencyPlan(source, run.runtime);
       if (deps) {
-        if (run.runtime === 'web') {
-          // Ignore generated registry overrides and resolved package URLs.
-          for (const name of ['.npmrc', 'npm-shrinkwrap.json', 'package-lock.json']) {
-            await fs.rm(path.join(work, name), { force: true });
-          }
-        }
         const key = id + ':' + fingerprint(deps.packages);
         if (!this.approvals.has(key)) {
           await this.publish(id, 'Approval', 'Waiting to download packages: ' + deps.packages.join(', '));
@@ -189,21 +189,18 @@ class Runner {
       return result;
     } finally {
       this.jobs.delete(id);
+      this.store.executing?.delete(id);
       const run = await this.store.read(id);
       run.lastCheck = result; await this.store.put(run);
     }
   }
   async prepareWork(id,source) {
-    const work=path.join(this.store.dir(id),'work');
-    await fs.rm(work,{recursive:true,force:true});await fs.mkdir(work,{recursive:true});
-    const run=await this.store.read(id);for(const directory of run.directories||[])await fs.mkdir(path.join(work,directory),{recursive:true});
-    for(const file of source){const target=path.join(work,file.path);await fs.mkdir(path.dirname(target),{recursive:true});await fs.writeFile(target,bytes(file));}
-    return work;
+    await this.store.read(id);
+    return this.store.workspace(id);
   }
   async cleanupWork(id) {
-    const root=path.resolve(this.store.dir(id)),work=path.resolve(root,'work');
-    if(path.dirname(work)!==root)throw new Error('Invalid temporary project path.');
-    await fs.rm(work,{recursive:true,force:true});
+    // The project directory is persistent; it is never removed after a run.
+    this.store.workspace(id);
   }
 }
 module.exports = { Runner, IMAGES };

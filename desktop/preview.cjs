@@ -24,7 +24,7 @@ async function preview(id, visible = false) {
   const run = await store.read(id);
   if (run.runtime !== 'web') throw new Error('Preview is available for web projects.');
   let entry = run.entrypoint;
-  const root = path.join(store.dir(id), 'work');
+  const root = store.workspace(id);
   try { await scopedRead(root, 'dist/index.html'); entry = 'dist/index.html'; } catch {}
   if (!/\.html?$/.test(entry)) throw new Error('No HTML preview entrypoint.');
   await scopedRead(root, entry);
@@ -53,7 +53,7 @@ async function preview(id, visible = false) {
   const window = new BrowserWindow({ width: 1050, height: 750, show: visible, title: run.title,
     webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, partition } });
   previews.get(id)?.close(); previews.set(id, window);
-  window.once('closed',()=>{if(previews.get(id)!==window)return;previews.delete(id);if(visible)fs.rm(root,{recursive:true,force:true}).catch(()=>{});});
+  window.once('closed',()=>{if(previews.get(id)!==window)return;previews.delete(id);});
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', e => e.preventDefault());
   const errors = [];

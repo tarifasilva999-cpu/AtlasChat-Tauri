@@ -22,11 +22,11 @@ The CLI looks for an existing `Atlas` or `atlas-desktop` data directory and
 reuses its `native-ai` cache. Set `ATLAS_USER_DATA_DIR` to choose the data
 directory explicitly when needed.
 
-Projects replaces the desktop **Build and run** toggle. Open **Projects** beside the composer to create a workspace, import a ZIP, resume a project, or start another chat in it. Select Apex 7.3 Ultra when asking for implementation work. Existing project cards and legacy runs remain readable and migrate in place.
+Open **Projects** in the sidebar to create a workspace, import a ZIP, resume a project, or start another chat in it. Atlas 7.5, Atlas 7.5 Mini and Atlas 7.5 Code can use the project workflow. Existing project cards and legacy runs remain readable and migrate in place.
 
 ## Workspace and conversations
 
-Each project has one canonical, persistent virtual filesystem in the app's user-data directory, under `coding-projects/<project-id>/workspace.json`. The atomic snapshot contains file paths, text or lossless binary content, metadata, revisions, project notes, command settings, activity, task telemetry and change history. ZIPs are import/export formats. All project chats refer to the same ID; follow-ups no longer copy a previous run into a new project.
+Each project has a persistent source directory in the app's user-data directory, at `coding-projects/<project-id>/workspace`. `workspace.json` records metadata, revisions, project notes, command settings, activity, task transcripts and change history. `project.zip` is a snapshot used for export and backup compatibility. Existing ZIP-backed projects are materialized into the directory on first access. All project chats refer to the same ID.
 
 The original Store is extended by `ProjectManager` in `projects.cjs`. Old `run.json` / `source.json` workspaces migrate on their first command without changing their identity. Chat histories remain separate in Atlas's existing chat storage. `SEARCH_CHATS` searches only matching fragments in other conversations belonging to this project, and only when requested. Shared project notes do not automatically archive conversations or summarize every turn.
 
@@ -47,7 +47,7 @@ The restricted preload exposes `projectCommand`, not a host filesystem or shell.
 | Shared context | SELECT_CONTEXT, GET_PROJECT_MEMORY, SET_PROJECT_MEMORY, SEARCH_CHATS (renderer chat storage) |
 | Edit | CREATE_FILE, WRITE_FILE, PATCH_FILE, DELETE_FILE, MOVE_FILE, RENAME_FILE, CREATE_DIRECTORY |
 | Configuration | SET_MANIFEST, SET_COMMANDS, RENAME_PROJECT |
-| Changes | GET_CHANGED_FILES, GET_RECENT_CHANGES, CHECKPOINT, LIST_CHECKPOINTS, ROLLBACK |
+| Changes | GET_CHANGED_FILES, GET_RECENT_CHANGES, CHECKPOINT, LIST_CHECKPOINTS, DIFF_CHECKPOINT, ROLLBACK |
 | Verify | AUDIT, CHECK_SYNTAX, VALIDATE_REFERENCES, VALIDATE_ASSETS; BUILD / RUN / RUN_TESTS / RUN_BROWSER_TEST use the combined verification pipeline |
 | Results | GET_BUILD_OUTPUT, GET_RUNTIME_OUTPUT, GET_CONSOLE_ERRORS, GET_NETWORK_ERRORS, SCREENSHOT |
 | Export | EXPORT_ZIP |
@@ -60,7 +60,7 @@ Context selection ranks filenames, symbols and matching source, then adds direct
 
 ## Models and usage
 
-Apex 7.3 Ultra produces one short architecture/interface plan for medium/large tasks. Simple edits skip architecture planning. The existing optional Ultra Code model loader handles implementation, preserving the model-download confirmation, cancellation and explicit fallback behavior. Model routing is separate from workspace management and validation. The current coding model ID remains Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC; its size does not define project storage or command capabilities. The context budget can be supplied through the adapter's `projectContextWindow` property; the current default is 4,096 tokens.
+Atlas produces a short architecture and file plan for medium and large tasks; simple edits use the existing project context. The optional Atlas 7.5 Code model loader preserves download confirmation, cancellation and fallback. The task transcript records planning, project actions and command results. The context budget can be supplied through the adapter's `projectContextWindow` property; the default is 4,096 tokens.
 
 | Complexity | Maximum model calls | Maximum automatic repairs | Maximum research calls |
 | --- | --- | --- | --- |
@@ -78,9 +78,9 @@ The pipeline is **targeted edits → deterministic audit → build/run → behav
 
 The static audit checks entrypoints, literal HTML/CSS asset paths, local imports, explicit named/default exports, undeclared npm dependencies, JSON configuration, JavaScript and inline-script syntax, and image signatures. Text masquerading as a PNG fails before execution. Unknown contracts and dynamic paths are not treated as statically proven.
 
-Static HTML projects without package.json run directly in a separate Electron preview session, with no host bridge, permissions, external network, navigation or popups. No Docker download is needed for these projects. The preview captures console errors, uncaught exceptions, failed/blocked resource requests, broken images and a screenshot. Manual Preview opens the app without executing its test clicks.
+Static HTML projects without package.json run directly in a separate Tauri WebView preview, with no host bridge, permissions, external network, navigation or popups. No Docker download is needed for these projects. The preview captures console errors, uncaught exceptions, failed/blocked resource requests, broken images and a screenshot. Manual Preview opens the app without executing its test clicks.
 
-Python and npm projects retain the original Docker runner. Only a disposable, materialized project copy is mounted. The canonical source, host home, credentials, Docker socket and chats are not mounted. Runtime images are pinned after approval. Containers retain read-only roots, non-root users, dropped capabilities, resource limits, bounded logs, cancellation, 90-second command limits, and networking only during approved dependency installation. Persistent servers and interactive stdin are not supported by this first execution adapter.
+Python and npm projects use the Docker runner with the persistent project workspace mounted at `/workspace`. Per-project dependency directories live separately under the project data directory. Source changes made by a command are detected and invalidate prior verification. The host home, credentials, Docker socket and chats are not mounted. Runtime images are pinned after approval. Containers retain read-only roots, non-root users, dropped capabilities, resource limits, bounded logs, cancellation, 90-second command limits, and networking only during approved dependency installation. Persistent servers and interactive stdin are not supported.
 
 Commands are detected from project configuration, recorded after successful execution, and can be overridden with finite node/python/npm argument arrays under **Project notes → Run commands**. These execute inside the container. Python gets compilation, unittest discovery and a finite entrypoint run; npm gets declared typecheck/build/test commands and finite Node entrypoints. Missing Docker retains source and reports execution unavailable.
 
@@ -104,9 +104,9 @@ A clean page load or a zero-test Python run cannot become a verified project. Py
 
 ## Backups and setup
 
-Desktop **Save a backup** includes all Projects, chat bindings, source, metadata and checkpoints in an AtlasBundle v2. Restore accepts v1/v2 bundles, assigns new project IDs, restores notes/commands/checkpoints, and requires fresh verification. Bundles are bounded to 50 MB expanded. Existing JSON chat-backup import remains available. Ordinary project ZIPs contain files/folders; use a desktop bundle to preserve Atlas-specific metadata and checkpoints.
+Desktop **Save a backup** includes Projects, chat bindings, source, metadata, task transcripts and checkpoints in an AtlasBundle v3. Restore accepts v1/v2/v3 bundles, assigns new project IDs, restores notes/commands/checkpoints, and requires fresh verification. Bundles are bounded to 50 MB expanded. Existing JSON chat-backup import remains available. Ordinary project ZIPs contain files/folders; use a desktop bundle to preserve Atlas-specific metadata and checkpoints.
 
-Development commands: `npm run desktop`, `npm run package`, `npm run check:core`, `npm run check:browser`. npm/Python execution needs Docker with Linux containers. No package build or model download was performed in this implementation pass.
+Development commands: `npm run desktop`, `npm run build:desktop`, `npm run check:core`, and `npm test`. npm/Python execution needs Docker with Linux containers.
 
 The existing research service is `service/research.cjs`. It uses BRAVE_SEARCH_API_KEY, ATLAS_SESSION_SECRET, optional HOST/PORT/ATLAS_SEARCH_HOURLY_LIMIT and ATLAS_TRUST_PROXY configuration. The desktop reads ATLAS_SEARCH_URL. Provider credentials remain on the service host. Public release still needs durable account/shared-service quotas; the existing anonymous in-memory limits are not a billing system.
 

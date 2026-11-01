@@ -29,6 +29,7 @@
     <img class="desktop-window-mark" src="./icons/Brand/Chat White.png" alt="" />
     <div class="mobile-brand" aria-hidden="true"><img class="mobile-app-icon" src="./icons/Brand/Chat White.png" alt="" /><span>AtlasChat</span></div>
     <div class="workspace-title" id="workspaceTitle">New chat</div>
+    <button class="project-chat-scope" id="projectChatScope" type="button" title="Open project" hidden></button>
     <div class="rail-spacer"></div>
     <button class="rail-button" id="headerTheme" aria-label="Change appearance" title="Change appearance"><svg id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button>
     <div class="atlas-actions">
@@ -2880,6 +2881,7 @@
     thread.innerHTML="";
     const c=activeChat();
     $("#workspaceTitle").textContent=c.messages.length?displayTitle(c):"New chat";
+    window.AtlasCoding?.updateProjectScope?.(c);
 
     if(!c.messages.length){
       renderHome();
@@ -3086,6 +3088,7 @@
 
   function switchChat(id){
     if(!state.chats.some(c=>c.id===id))return;
+    if(window.AtlasCoding?.leaveProjectWorkspace?.()===false)return;
     saveMobileDraft();
     state.activeChatId=id;
     activateChatModel(id);
@@ -3095,13 +3098,14 @@
   }
 
   function newChat(projectId=null){
+    if(window.AtlasCoding?.leaveProjectWorkspace?.()===false)return;
     const current=activeChat();
     if(!projectId&&current&&!current.messages.length&&!current.projectId&&!current.title?.trim()){
       closeSidebarIfMobile();input.focus();return;
     }
     saveMobileDraft();
     const c=blankChat();
-    c.modelChoice=state.poem3Mode?"poem3":state.modelChoice;
+    c.modelChoice=state.poem3Mode?(projectId?"apex-ultra":"poem3"):state.modelChoice;
     if(projectId)c.projectId=projectId;
     state.chats.push(c);
     state.activeChatId=c.id;
@@ -3111,7 +3115,7 @@
     persist();renderHistory();renderCurrent(true);
     closeSidebarIfMobile();
     input.focus();
-    if(projectId){push("assistant","Project workspace").kind="coding-project";activeChat().messages.at(-1).projectRunId=projectId;persist();renderCurrent(true);}
+    if(projectId)window.AtlasCoding?.registerProjectChat?.(c);
   }
 
   function deleteChat(id){
