@@ -8,7 +8,11 @@ let checkInFlight = null;
 let updateFound = false;
 
 async function checkForUpdates(force = false) {
-  if (!UPDATE_FEED_CONFIGURED || !window.atlasDesktop || !window.__TAURI__ || !navigator.onLine) return false;
+  if (!UPDATE_FEED_CONFIGURED || !window.atlasDesktop || !window.__TAURI__) return false;
+  if (!navigator.onLine) {
+    if (force) throw new Error("Connect to the internet to check for updates.");
+    return false;
+  }
   if (checkInFlight) return checkInFlight;
   if (updateFound && !force) return true;
 
@@ -24,6 +28,7 @@ async function checkForUpdates(force = false) {
       return true;
     } catch (error) {
       console.info("Atlas update check is unavailable:", error?.message || error);
+      if (force) throw error;
       return false;
     } finally {
       checkInFlight = null;
