@@ -66,7 +66,8 @@ impl Backend {
         let id = self.sequence.fetch_add(1, Ordering::Relaxed) + 1;
         let (sender, receiver) = oneshot::channel(); self.pending.lock().unwrap().insert(id, sender);
         if let Err(error) = self.send(&json!({"id":id,"name":name,"value":value})) { self.pending.lock().unwrap().remove(&id); return Err(error); }
-        let result = tokio::time::timeout(std::time::Duration::from_secs(2800), receiver).await;
+        let timeout = if name == "imagePrepare" { 21600 } else { 2800 };
+        let result = tokio::time::timeout(std::time::Duration::from_secs(timeout), receiver).await;
         self.pending.lock().unwrap().remove(&id);
         result.map_err(|_| "Native request time limit reached".to_string())?.map_err(|_| "Native request interrupted".to_string())?
     }

@@ -136,7 +136,7 @@ class NativeInference {
     operation.promise = (async () => {
       try {
         this.notify('starting', `Preparing ${model.label} on this computer…`);
-        if (os.totalmem() < model.minimumGB * 1024 ** 3) throw failure(`${model.label} needs at least ${model.minimumGB} GB of system memory. Choose Forge or Firefly on this computer.`);
+        if (os.totalmem() < model.minimumGB * 1024 ** 3) throw failure(`${model.label} needs at least ${model.minimumGB} GB of system memory. Choose a smaller Atlas model on this computer.`);
         await fs.mkdir(this.directory, { recursive: true });
         const modelPath = await this.modelFiles(choice, model, controller.signal);
         await this.stopServer();
@@ -180,7 +180,7 @@ class NativeInference {
     const port = await availablePort(), apiKey = crypto.randomBytes(32).toString('hex'), lease = crypto.randomUUID();
     const threads = Math.max(1, Math.min(12, (os.availableParallelism?.() || os.cpus().length) - 1));
     const args = ['--model', model, '--host', '127.0.0.1', '--port', String(port), '--ctx-size', String(context), '--parallel', '1',
-      '--n-gpu-layers', cpu ? '0' : 'auto', '--threads', String(threads), '--batch-size', '256', '--ubatch-size', '128', '--no-webui', '--no-context-shift', '--log-verbosity', '4'];
+      '--n-gpu-layers', cpu ? '0' : 'auto', '--threads', String(threads), '--batch-size', '256', '--ubatch-size', '128', '--jinja', '--no-webui', '--no-context-shift', '--log-verbosity', '4'];
     if (cpu) args.push('--device', 'none');
     const child = this.spawn(runtime.server, args, { cwd: path.dirname(runtime.server), windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LLAMA_API_KEY: apiKey,
@@ -248,7 +248,7 @@ class NativeInference {
         method: 'POST', signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${server.apiKey}` },
         body: JSON.stringify({ model: 'local', messages, stream: true, max_tokens: maxTokens, temperature,
-          top_p: 0.9, repeat_penalty: 1.1 })
+          top_p: 0.9, min_p: 0, repeat_penalty: 1.1, chat_template_kwargs: { enable_thinking: false } })
       });
       if (!response.ok || !response.body) {
         const detail = await response.json().catch(() => null);

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>AtlasChat</title>
-<meta name="description" content="Atlas — private local AI powered by Apex 7.3." />
+<meta name="description" content="Atlas — private local AI powered by Atlas 7.5." />
 <link rel="stylesheet" href="./atlas-ui.css" />
 <link rel="manifest" href="./manifest.webmanifest" />
 <meta name="theme-color" content="#202020" />
@@ -132,10 +132,10 @@
         </section>
         <button type="button" class="intelligence-trigger" id="intelligenceTrigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="intelligencePopover">Intelligence</button>
         <section class="intelligence-popover" id="intelligencePopover" role="dialog" aria-label="Intelligence settings" hidden>
-          <header class="intelligence-head"><div><small>CONTEXT</small><strong id="intelligenceProfileTitle">Apex 7.3 Pro</strong></div><button type="button" id="intelligenceClose" aria-label="Save and close">×</button></header>
+          <header class="intelligence-head"><div><small>CONTEXT</small><strong id="intelligenceProfileTitle">Atlas 7.5</strong></div><button type="button" id="intelligenceClose" aria-label="Save and close">×</button></header>
           <div class="intelligence-profile-tabs" id="intelligenceProfileTabs" role="tablist" aria-label="Model context profile" hidden>
-            <button type="button" role="tab" data-context-profile="apex-ultra" aria-selected="true">Apex Ultra</button>
-            <button type="button" role="tab" data-context-profile="ultra-code" aria-selected="false">Ultra Code</button>
+            <button type="button" role="tab" data-context-profile="apex-ultra" aria-selected="true">Atlas 7.5</button>
+            <button type="button" role="tab" data-context-profile="ultra-code" aria-selected="false">Atlas 7.5 Code</button>
           </div>
           <div class="intelligence-value"><span>Context</span><strong id="intelligenceValue">Standard (4K)</strong></div>
           <div class="intelligence-slider" id="intelligenceSliderWrap" data-level="0">
@@ -155,10 +155,10 @@
           <p class="model-picker-notice" id="modelPickerNotice" role="status" hidden></p>
           <div class="model-picker-body">
             <div class="model-simple-list">
-              <button type="button" class="model-option" data-model-choice="ultra-code" aria-pressed="false"><span>Apex 7.3 UltraCode</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
-              <button type="button" class="model-option" data-model-choice="apex-ultra" aria-pressed="false"><span>Apex 7.3</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
-              <button type="button" class="model-option" data-model-choice="forge" aria-pressed="false"><span>Forge 2.1</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
-              <button type="button" class="model-option" data-model-choice="firefly" aria-pressed="false"><span>Firefly 4.5</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+              <button type="button" class="model-option" data-model-choice="ultra-code" aria-pressed="false"><span>Atlas 7.5 Code</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+              <button type="button" class="model-option" data-model-choice="apex-ultra" aria-pressed="false"><span>Atlas 7.5</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+              <button type="button" class="model-option" data-model-choice="forge" aria-pressed="false"><span>Atlas 7.5 Mini</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+              <button type="button" class="model-option" data-model-choice="poem3" aria-pressed="false"><span>Image 1.1</span><svg class="model-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
             </div>
           </div>
         </section>
@@ -282,7 +282,7 @@
     <details class="technical-details"><summary>Technical details</summary>
       <dl class="info-grid">
         <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B21</dd></div>
-        <div class="info-row"><dt>Engine</dt><dd id="aboutEngine">Apex 7.3 · WebLLM / MLC · WebGPU</dd></div>
+        <div class="info-row"><dt>Engine</dt><dd id="aboutEngine">Atlas 7.5 · WebLLM / MLC · WebGPU</dd></div>
         <div class="info-row"><dt>Context</dt><dd>4K tokens, with summaries of earlier turns. Your full transcript is saved.</dd></div>
         <div class="info-row"><dt>Storage</dt><dd>Schema v1 · chats and memory are saved independently of app updates.</dd></div>
       </dl>
@@ -664,8 +664,8 @@
   };
   function normalizeFontChoice(choice,fallback){return Object.prototype.hasOwnProperty.call(FONT_FAMILY_STACKS,choice)?choice:fallback;}
   const MIGRATION_KEY = "apex.migration.v1";
-  const RUNTIME_READY_KEY = window.atlasDesktop?"atlas.native.quality.v1.ready":"atlas.webllm.quality.v2.ready";
-  const ULTRA_CODE_MODEL_ID="Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC";
+  const RUNTIME_READY_KEY = window.atlasDesktop?"atlas.native.75.v1.ready":"atlas.webllm.quality.v2.ready";
+  const ULTRA_CODE_MODEL_ID="atlas-native-code";
   const CONTEXT_OPTIONS={
     fixed:[{name:"Standard",tokens:4096}],
     "apex-pro":[{name:"Standard",tokens:4096},{name:"Expanded",tokens:6144},{name:"High",tokens:10240}],
@@ -727,7 +727,7 @@
       titleState:c?.titleState||((c?.title&&c.title!=="New chat")?"ready":"empty"),
       created:c?.created||Date.now(),
       updated:c?.updated||Date.now(),
-      modelChoice:["firefly","forge","apex-ultra","ultra-code","poem3"].includes(c?.modelChoice)?c.modelChoice:null,
+      modelChoice:c?.modelChoice==="firefly"?"forge":["forge","apex-ultra","ultra-code","poem3"].includes(c?.modelChoice)?c.modelChoice:null,
       messages:Array.isArray(c?.messages)?c.messages:[],
       memory:Array.isArray(c?.memory)?c.memory:[],
       contextSummary:typeof c?.contextSummary==="string"?c.contextSummary:"",
@@ -832,7 +832,7 @@
     sessionStorage.removeItem(MOBILE_PENDING_KEY);
   }catch{}
 
-  const savedModelChoice=bootData.settingsStore.modelChoice;
+  const savedModelChoice=bootData.settingsStore.modelChoice==="firefly"?"forge":bootData.settingsStore.modelChoice;
   const initialModelChoice=["apex-light","apex-pro","apex-ultra"].includes(savedModelChoice)?"apex-ultra":
     ["firefly","forge","apex-ultra","ultra-code"].includes(savedModelChoice)?savedModelChoice:
     (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)?"forge":bootData.settingsStore.qualityMode==="large"?"apex-ultra":"apex-ultra");
@@ -850,7 +850,7 @@
     qualityMode:bootData.settingsStore.qualityMode==="large"?"large":"balanced",
     fastMode:bootData.settingsStore.fastMode===true,
     codingMode:bootData.settingsStore.codingMode===true,
-    poem3Mode:bootData.settingsStore.poem3Mode===true&&Boolean(navigator.gpu),
+    poem3Mode:bootData.settingsStore.poem3Mode===true&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare),
     modelChoice:initialModelChoice,
     effort:initialEffort,
     contextPreferences:initialContextPreferences,
@@ -893,10 +893,10 @@
     state.activeChatId=state.chats[0].id;
   }
   for(const chat of state.chats){
-    if(!chat.modelChoice)chat.modelChoice=chat.id===state.activeChatId&&bootData.settingsStore.poem3Mode===true&&Boolean(navigator.gpu)?"poem3":initialModelChoice;
+    if(!chat.modelChoice)chat.modelChoice=chat.id===state.activeChatId&&bootData.settingsStore.poem3Mode===true&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare)?"poem3":initialModelChoice;
   }
   state.modelChoice=state.chats.find(c=>c.id===state.activeChatId)?.modelChoice||initialModelChoice;
-  state.poem3Mode=state.modelChoice==="poem3"&&Boolean(navigator.gpu);
+  state.poem3Mode=state.modelChoice==="poem3"&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
   const savedActive=state.chats.find(c=>c.id===state.activeChatId);
   if(savedActive?.messages.length&&!resumeMobileChat){
     const freshChat=blankChat();
@@ -1094,16 +1094,16 @@
       const limitedPC=!mobile&&deviceMemory>0&&deviceMemory<8;
       const candidates=[];
       const choice=this.choice||state.modelChoice;
-      const choiceLabel={firefly:"Firefly 4.5",forge:"Forge 2.1","apex-ultra":"Apex 7.3", "ultra-code":"Apex 7.3 UltraCode"}[choice]||"Forge 2.1";
+      const choiceLabel={firefly:"Atlas 7.5 Mini",forge:"Atlas 7.5 Mini","apex-ultra":"Atlas 7.5", "ultra-code":"Atlas 7.5 Code"}[choice]||"Atlas 7.5 Mini";
       const add=(base,label=choiceLabel,tier="quality")=>{
         const precision=hasF16?"q4f16_1":"q4f32_1";
         candidates.push({id:`${base}-${precision}-MLC`,label:choiceLabel,tier});
       };
       if(choice==="firefly"){
-        add("Llama-3.2-1B-Instruct","Firefly 4.5","mobile");
+        add("Llama-3.2-1B-Instruct","Atlas 7.5 Mini","mobile");
       }else if(choice==="forge"){
-        if(!ios&&(!mobile||capableAndroid))add("Qwen2.5-1.5B-Instruct","Forge 2.1","mobile");
-        add("Llama-3.2-1B-Instruct","Forge 2.1","fallback");
+        if(!ios&&(!mobile||capableAndroid))add("Qwen2.5-1.5B-Instruct","Atlas 7.5 Mini","mobile");
+        add("Llama-3.2-1B-Instruct","Atlas 7.5 Mini","fallback");
       }else if(choice==="ultra-code"){
         candidates.push({id:ULTRA_CODE_MODEL_ID,label:choiceLabel,tier:"ultra-code"});
       }else if(choice.startsWith("apex-")){
@@ -1677,8 +1677,8 @@
   let ai=createAiAdapter(state.modelChoice,"primary");
   let secondaryAi=null,secondaryChatId=null,secondaryJob=null;
   const backgroundModelIds=new Set(["firefly","forge"]);
-  if(ai.native)$("#aboutEngine").textContent="Apex 7.3 · Native desktop engine";
-  let nativeSetupStopping=false;
+  if(ai.native)$("#aboutEngine").textContent="Atlas 7.5 · Native desktop engine";
+  let nativeSetupStopping=false,imageSetupStopRequested=false;
   const nativeStopButtons=ai.native?[setupFoot.parentElement,loader].map(parent=>{
     const button=document.createElement("button");button.type="button";button.className="native-setup-stop";
     button.textContent="Stop";button.hidden=true;button.onclick=stopNativeSetup;parent.append(button);return button;
@@ -1939,11 +1939,11 @@
       ? data.settings.fastMode:state.fastMode;
     const importedCoding=typeof data.settings?.codingMode==="boolean"
       ? data.settings.codingMode:state.codingMode;
-    const backupModelChoice=data.settings?.modelChoice;
+    const backupModelChoice=data.settings?.modelChoice==="firefly"?"forge":data.settings?.modelChoice;
     const importedModelChoice=["apex-light","apex-pro","apex-ultra"].includes(backupModelChoice)?"apex-ultra":
       ["firefly","forge","ultra-code"].includes(backupModelChoice)?backupModelChoice:state.modelChoice;
     const importedEffort=normalizeEffort(data.settings?.effort||state.effort);
-    const importedPoem3Mode=data.settings?.poem3Mode===true&&Boolean(navigator.gpu);
+    const importedPoem3Mode=data.settings?.poem3Mode===true&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
     for(const chat of state.chats){if(!chat.modelChoice)chat.modelChoice=chat.id===state.activeChatId&&importedPoem3Mode?"poem3":importedModelChoice;}
     const importedActiveModel=activeChat().modelChoice||importedModelChoice;
     const importedContextPreferences=data.settings?.contextPreferences&&typeof data.settings.contextPreferences==="object"
@@ -2904,7 +2904,7 @@
       else if(state.hasToken)paintPendingText();
     }else if(secondaryJob?.chatId===c.id&&secondaryJob.status!=="done"){
       secondaryJob.pendingEl=addMessageEl("assistant","",true);
-      const modelLabel=secondaryJob.pendingEl.shell.querySelector(".assistant-label");if(modelLabel)modelLabel.textContent=modelChoiceNames[secondaryJob.choice]||"Forge 2.1";
+      const modelLabel=secondaryJob.pendingEl.shell.querySelector(".assistant-label");if(modelLabel)modelLabel.textContent=modelChoiceNames[secondaryJob.choice]||"Atlas 7.5 Mini";
       secondaryJob.pendingEl.status.textContent=secondaryJob.statusText||"Thinking";
       if(secondaryJob.pendingText)paintSecondaryJob(secondaryJob);
     }
@@ -2967,17 +2967,15 @@
     if(role==="assistant"){
       const label=document.createElement("div");label.className="assistant-label";
       if(message?.kind==="poem3-image"){
-        label.textContent="Poem 3";
+        label.textContent=message?.modelName||"Poem 3";
       }else if(message?.kind==="coding-project"){
-        const modelName=message?.modelName||"Apex 7.3 Ultra";
-        if(modelName==="Apex 7.3 Ultra Code"||modelName==="Apex 7.3 UltraCode"){
+        const modelName=message?.modelName||"Atlas 7.5";
+        if(modelName==="Atlas 7.5 Code"){
           const icon=document.createElement("img");icon.src="./icons/ModelIcons/7.3%20Ultra%20Code.png";icon.alt="";
           label.append(icon,document.createTextNode(modelName));
         }else label.textContent=modelName;
       }else{
-        const knownProfiles=Object.values(modelChoiceNames);
-        label.textContent=knownProfiles.includes(message?.modelName)
-          ? message.modelName:(modelChoiceNames[state.modelChoice]||"Atlas");
+        label.textContent=message?.modelName||modelChoiceNames[state.modelChoice]||"Atlas";
       }
       shell.appendChild(label);
     }
@@ -3055,7 +3053,7 @@
 
   function pushToChat(c,role,content,metadata={}){
     const message={id:uid(),role,content,ts:Date.now(),...metadata};
-    if(role==="assistant"&&!message.modelName)message.modelName=state.poem3Mode?"Poem 3":(modelChoiceNames[state.modelChoice]||"Forge 2.1");
+    if(role==="assistant"&&!message.modelName)message.modelName=state.poem3Mode?"Image 1.1":(modelChoiceNames[state.modelChoice]||"Atlas 7.5 Mini");
     c.messages.push(message);
     c.updated=Date.now();
     persist();renderHistory();
@@ -3390,7 +3388,7 @@
     content:
 `You are the AI assistant inside Atlas.
 
-Atlas is a private chat app with on-device AI. The selected Atlas model is ${modelChoiceNames[state.modelChoice]||"Forge 2.1"}. Use this name when asked which model is selected. Keep backend model names and runtime identifiers internal. Describe Atlas in plain language; avoid implementation jargon unless the user asks. The desktop project workflow is ${window.atlasDesktop?"available in this app":"unavailable in this browser"}.
+Atlas is a private chat app with on-device AI. The selected Atlas model is ${modelChoiceNames[state.modelChoice]||"Atlas 7.5 Mini"}. Use this name when asked which model is selected. Keep backend model names and runtime identifiers internal. Describe Atlas in plain language; avoid implementation jargon unless the user asks. The desktop project workflow is ${window.atlasDesktop?"available in this app":"unavailable in this browser"}.
 
 Atlas Build and run is a desktop workflow. In text chats, the selected model can use an attached project to read shared files and recent discussions from other chats in that project. File changes go into the shared project workspace. Supported checks run in an isolated environment; describe checks in plain language and do not expose raw shell commands. It does not run persistent servers or arbitrary desktop apps. In a browser without the desktop project workflow, explain the limitation and do not claim you built, ran, or tested a project.
 
@@ -3515,14 +3513,21 @@ Local date/time: ${current}.${global}${local}`
     if(window.AtlasPoem3?.isReady?.()){
       state.poem3Ready=false;
       window.AtlasPoem3.unload().then(loadChatModel).catch(error=>{
-        console.warn("Poem 3 could not release its local runtime:",error);
+        console.warn("Image 1.1 could not release its local runtime:",error);
         loadChatModel();
       });
     }else loadChatModel();
   }
 
   async function stopNativeSetup(){
-    if(!ai.native||!state.loading||nativeSetupStopping||state.poem3Loading)return;
+    if(!ai.native||!state.loading||nativeSetupStopping)return;
+    if(state.poem3Loading){
+      nativeSetupStopping=true;imageSetupStopRequested=true;updateIntelligenceControls();
+      poem3AbortController?.abort();
+      try{await window.atlasDesktop.imageCancel();await Promise.resolve(poem3LoadTask).catch(()=>{});}
+      finally{nativeSetupStopping=false;imageSetupStopRequested=false;hideLoader(0);updateModelControls();setRailStatus("ready");}
+      return;
+    }
     nativeSetupStopping=true;state.queued=false;state.pendingEl?.root?.remove();state.pendingEl=null;state.pendingId=null;
     clearTimeout(workerHandshakeTimer);workerHandshakeTimer=null;send.disabled=true;updateIntelligenceControls();
     try{await ai._dispose();}
@@ -3742,7 +3747,7 @@ Local date/time: ${current}.${global}${local}`
       const generated=String(m?.text||job.rawText||job.pendingText||"").trim()||"…";
       const latest=[...c.messages].reverse().find(message=>message.role==="user")?.content||"";
       const finalText=m?.stopped?generated+"\n\n_Reply stopped._":normalizeCodeResponse(generated,latest);
-      pushToChat(c,"assistant",finalText,{modelName:modelChoiceNames[job.choice]||"Forge 2.1"});
+      pushToChat(c,"assistant",finalText,{modelName:modelChoiceNames[job.choice]||"Atlas 7.5 Mini"});
       if(c.id!==state.activeChatId)showToast(`Reply finished in ${displayTitle(c)}`);
       if(c.id===state.activeChatId)renderCurrent();
       deferredTitleChats.add(c.id);
@@ -3788,7 +3793,7 @@ Local date/time: ${current}.${global}${local}`
     const savedChoice=c.modelChoice||state.modelChoice;
     const choice=modelChoicesWhileBackground().has(savedChoice)?savedChoice:(modelChoicesWhileBackground().has(state.modelChoice)?state.modelChoice:"forge");
     if(!modelChoicesWhileBackground().has(choice)){
-      showToast("While another reply runs, use Forge 2.1, Firefly 4.5, or its model unless it is Poem 3 or Apex 7.3.");return;
+      showToast("While another reply runs, use Atlas 7.5 Mini or the model already running.");return;
     }
     const job={id:uid(),chatId,choice,effort:state.effort,runtime:null,status:"starting",statusText:"Starting the second local model…",pendingText:"",rawText:"",pendingRequest:"",pendingEl:null,watchdog:null};
     secondaryJob=job;
@@ -3886,7 +3891,7 @@ Local date/time: ${current}.${global}${local}`
       state.poem3ProgressLabel=info.percent===null?info.label:`${info.label} ${info.percent}%`;
       const downloading=/download/i.test(info.label);
       const amount=info.detail||(info.percent===null?info.label:`${info.percent}%`);
-      showPoem3Loader(downloading?"Downloading Poem 3":"Getting Poem 3 ready",amount,info.percent,info.percent===null);
+      showPoem3Loader(downloading?"Downloading Image 1.1":"Getting Image 1.1 ready",amount,info.percent,info.percent===null);
       return;
     }
   }
@@ -3907,33 +3912,35 @@ Local date/time: ${current}.${global}${local}`
   function poem3ErrorMessage(error){
     const source=String(error?.message||error||"").toLowerCase();
     if(/abort|cancel|stopped/.test(source))return "Image creation stopped.";
-    if(/quota|storage|space/.test(source))return "There isn't enough local storage for Poem 3. Free up space and try again.";
+    if(/quota|storage|space|enospc/.test(source))return "There isn't enough local storage for Image 1.1. Free up space and try again.";
+    if(/Image 1\.1 (?:currently requires|could not run)/i.test(String(error?.message||error)))return String(error?.message||error).slice(0,500);
     if(/network|fetch|download|http|timeout/.test(source))return "Atlas couldn't get the image model ready. Check your connection and try again.";
     if(/webgpu|adapter|device|gpu|memory/.test(source))return "This device couldn't start local image generation. Check WebGPU support and try again.";
-    return "Poem 3 couldn’t create that image. Try again with a shorter prompt.";
+    return "Image 1.1 couldn’t create that image. Try again with a shorter prompt.";
   }
   async function ensurePoem3Ready(){
     if(state.poem3Ready&&window.AtlasPoem3?.isReady?.())return;
     if(poem3LoadTask)return poem3LoadTask;
-    if(!navigator.gpu||!window.AtlasPoem3)throw new Error("Local image generation isn’t available in this browser.");
+    if(!(navigator.gpu||window.atlasDesktop?.imagePrepare)||!window.AtlasPoem3)throw new Error("Local image generation isn’t available in this browser.");
 
-    state.poem3Loading=true;state.loading=true;state.poem3ProgressLabel="Checking saved download…";
+    imageSetupStopRequested=false;state.poem3Loading=true;state.loading=true;state.poem3ProgressLabel="Checking saved download…";
     updateModelControls();setRailStatus("busy");
-    showPoem3Loader("Getting Poem 3 ready","Checking saved download",null,true);
+    showPoem3Loader("Getting Image 1.1 ready","Checking saved download",null,true);
     const task=(async()=>{
       try{
         if(state.loaded){state.loaded=false;state.activeModelLabel="";state.activeRuntimeModel="";await ai._dispose();}
+        if(imageSetupStopRequested)throw new DOMException("Image creation stopped.","AbortError");
         await window.AtlasPoem3.prepare({onProgress:poem3Progress});
         state.poem3Ready=true;state.poem3ProgressLabel="Ready on this device";
         void requestPersistentStorage();
         setRailStatus("ready");
-        showPoem3Loader("Poem 3 is ready","Saved on this device",100,false);
+        showPoem3Loader("Image 1.1 is ready","Saved on this device",100,false);
         hideLoader(1000);
         return true;
       }catch(error){
         state.poem3Ready=false;state.poem3ProgressLabel=poem3ErrorMessage(error);
         setRailStatus("error");modelErrorDetails.textContent=state.poem3ProgressLabel;
-        showPoem3Loader("Poem 3 couldn’t start",state.poem3ProgressLabel,100,false);
+        showPoem3Loader("Image 1.1 couldn’t start",state.poem3ProgressLabel,100,false);
         hideLoader(5000);
         throw error;
       }finally{
@@ -3945,12 +3952,12 @@ Local date/time: ${current}.${global}${local}`
   }
   function startPoem3Preload(){
     void ensurePoem3Ready().catch(error=>{
-      console.warn("Poem 3 could not be prepared:",error);
+      console.warn("Image 1.1 could not be prepared:",error);
       if(state.poem3Mode)showToast(poem3ErrorMessage(error));
     });
   }
   async function generatePoem3Image(prompt){
-    if(!navigator.gpu||!window.AtlasPoem3){showFriendlyError("Local image generation isn't available in this browser.");return;}
+    if(!(navigator.gpu||window.atlasDesktop?.imagePrepare)||!window.AtlasPoem3){showFriendlyError("Local image generation isn't available in this browser.");return;}
     const chat=activeChat();
     state.generating=true;state.poem3Generating=true;state.pendingId=uid();poem3AbortController=new AbortController();
     poem3LastProgress=null;
@@ -3960,14 +3967,16 @@ Local date/time: ${current}.${global}${local}`
       poem3PreviousImageId=previous?.imageId||null;
       ensurePoem3Overlay();
       poem3Progress({stage:"load"});scrollBottom();
-      await window.AtlasPoem3.withSignal(ensurePoem3Ready(),poem3AbortController.signal);
+      const stopImageDownload=()=>{void window.atlasDesktop?.imageCancel?.();};
+      poem3AbortController.signal.addEventListener("abort",stopImageDownload,{once:true});
+      try{await window.AtlasPoem3.withSignal(ensurePoem3Ready(),poem3AbortController.signal);}finally{poem3AbortController.signal.removeEventListener("abort",stopImageDownload);}
       const result=await window.AtlasPoem3.generate(prompt,{width:512,height:512,signal:poem3AbortController.signal,onProgress:poem3Progress});
       const preview=await window.AtlasPoem3.withSignal(window.AtlasPoem3.loadPreview(result.id),poem3AbortController.signal);
       if(!preview)throw new Error("The finished image could not be opened.");
       const overlay=ensurePoem3Overlay();
       if(overlay)await overlay.finish(preview,`Generated image: ${String(prompt).slice(0,2000)}`).catch(()=>{});
       const message=pushToChat(chat,"assistant","Generated an image.");
-      message.kind="poem3-image";message.modelName="Poem 3";message.imageId=result.id;message.imageWidth=result.width;message.imageHeight=result.height;message.imagePrompt=String(prompt).slice(0,2000);
+      message.kind="poem3-image";message.modelName="Image 1.1";message.imageId=result.id;message.imageWidth=result.width;message.imageHeight=result.height;message.imagePrompt=String(prompt).slice(0,2000);
       persist();
       if(!chat.title){chat.title=titleFallback(chat.id);chat.titleState="ready";persist();renderHistory();}
       const isVisible=state.activeChatId===chat.id;
@@ -3978,7 +3987,7 @@ Local date/time: ${current}.${global}${local}`
       poem3Overlay?.dispose();
       const text=poem3ErrorMessage(error);
       state.pendingEl?.root?.remove();state.pendingEl=null;state.pendingId=null;state.pendingChatId=null;state.pendingRequest="";state.generating=false;state.poem3Generating=false;
-      const message=pushToChat(chat,"assistant",text);message.modelName="Poem 3";persist();
+      const message=pushToChat(chat,"assistant",text);message.modelName="Image 1.1";persist();
       if(state.activeChatId===chat.id)renderCurrent();else showToast(`Image generation stopped in ${displayTitle(chat)}`);
     }finally{
       poem3Overlay?.dispose();poem3Overlay=null;
@@ -4328,7 +4337,7 @@ Local date/time: ${current}.${global}${local}`
       const latest=[...chat.messages].reverse().find(message=>message.role==="user")?.content||"";
       const stoppedText=(generatedText.match(/```/g)||[]).length%2?generatedText+"\n```":generatedText;
       const finalText=m.stopped?stoppedText+"\n\n_Reply stopped._":normalizeCodeResponse(generatedText,latest);
-      if(generatedText||!m.stopped)pushToChat(chat,"assistant",finalText,{modelName:modelChoiceNames[state.pendingModelChoice]||"Forge 2.1"});
+      if(generatedText||!m.stopped)pushToChat(chat,"assistant",finalText,{modelName:modelChoiceNames[state.pendingModelChoice]||"Atlas 7.5 Mini"});
 
       if(m.backend) state.backend=m.backend;
       setRailStatus("ready");
@@ -4450,8 +4459,8 @@ Local date/time: ${current}.${global}${local}`
     const busy=state.generating||state.queued||secondaryJob||state.loading||state.titleGenerating;
     const ultraReady=Boolean(window.atlasDesktop&&window.AtlasCoding?.run&&(state.modelChoice==="apex-ultra"||state.modelChoice==="ultra-code")&&!busy);
     const entries=[
-      {id:"ultra-code",label:"Ultra Code",detail:ultraReady?"Use Ultra Code for this request":!window.atlasDesktop?"Available in Atlas desktop":"Select Apex 7.3 for this optional coding model",disabled:!ultraReady,token:"@Ultra Code"},
-      {id:"image",label:"Image generation",detail:navigator.gpu?"Generate a local image with Poem 3":"This browser does not support local image generation",disabled:!navigator.gpu,token:"@Image generation"}
+      {id:"ultra-code",label:"Atlas 7.5 Code",detail:ultraReady?"Use Atlas 7.5 Code for this request":!window.atlasDesktop?"Available in Atlas desktop":"Select Atlas 7.5 for this optional coding model",disabled:!ultraReady,token:"@Atlas 7.5 Code"},
+      {id:"image",label:"Image generation",detail:(navigator.gpu||window.atlasDesktop?.imagePrepare)?"Generate a local image with Image 1.1":"Image generation is unavailable",disabled:!(navigator.gpu||window.atlasDesktop?.imagePrepare),token:"@Image generation"}
     ];
     if(window.atlasDesktop&&projects.length){
       projects.forEach(project=>entries.push({id:"project",label:`Project: ${project.title}`,detail:"Use this project in the current chat",project,token:`@Project: ${project.title}`}));
@@ -4580,7 +4589,7 @@ Local date/time: ${current}.${global}${local}`
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||
       (navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
   }
-  const modelChoiceNames={firefly:"Firefly 4.5",forge:"Forge 2.1","apex-ultra":"Apex 7.3","ultra-code":"Apex 7.3 UltraCode",poem3:"Poem 3"};
+  const modelChoiceNames={firefly:"Atlas 7.5 Mini",forge:"Atlas 7.5 Mini","apex-ultra":"Atlas 7.5","ultra-code":"Atlas 7.5 Code",poem3:"Image 1.1"};
   const modelPicker=$("#modelPicker"),modelPickerTrigger=$("#modelPickerTrigger");
   const modelPickerNotice=$("#modelPickerNotice");
   const MODEL_LOAD_SWITCH_DELAY_MS=2000;
@@ -4607,9 +4616,9 @@ Local date/time: ${current}.${global}${local}`
     let choice=chat.modelChoice||initialModelChoice;
     if(hasReplyInOtherChat(chatId)&&!modelChoicesWhileBackground().has(choice)){
       choice="forge";
-      showToast("This chat is using Forge while another reply runs.");
+      showToast("This chat is using Atlas 7.5 Mini while another reply runs.");
     }
-    state.modelChoice=choice;state.poem3Mode=choice==="poem3"&&Boolean(navigator.gpu);
+    state.modelChoice=choice;state.poem3Mode=choice==="poem3"&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
     persistSettings();
     if(!hasReplyInOtherChat(chatId)&&!state.generating&&!(secondaryJob&&secondaryJob.chatId!==chatId)&&!(secondaryJob?.chatId===chatId)){
       if(ai.choice!==choice){
@@ -4639,7 +4648,7 @@ Local date/time: ${current}.${global}${local}`
   function restoreActiveChatModel(){
     if(state.generating||state.queued||secondaryJob||state.titleGenerating)return;
     const chat=activeChat(),choice=chat.modelChoice||initialModelChoice;
-    state.modelChoice=choice;state.poem3Mode=choice==="poem3"&&Boolean(navigator.gpu);persistSettings();
+    state.modelChoice=choice;state.poem3Mode=choice==="poem3"&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);persistSettings();
     if(secondaryAi){const previous=secondaryAi;secondaryAi=null;secondaryChatId=null;void previous._dispose().catch(()=>{}).finally(()=>previous._detach?.());}
     if(ai.choice!==choice){
       const ticket=++modelActivationTicket,needsDispose=Boolean(ai.engine||ai.loadingPromise);
@@ -4690,7 +4699,7 @@ Local date/time: ${current}.${global}${local}`
   let contextDraftPreferences=null,contextDraftProfile="";
   function contextSettingsLocked(){return state.generating||state.queued||secondaryJob||state.loading||state.titleGenerating||state.contextApplying}
   function updateIntelligenceControls(){
-    for(const button of nativeStopButtons){button.hidden=!state.loading||state.poem3Loading;button.disabled=nativeSetupStopping;}
+    for(const button of nativeStopButtons){button.hidden=!state.loading;button.disabled=nativeSetupStopping;}
     const locked=contextSettingsLocked();
     intelligenceTrigger.disabled=locked;
     if(!intelligencePopover.hidden){
@@ -4699,7 +4708,7 @@ Local date/time: ${current}.${global}${local}`
       intelligenceStops.querySelectorAll("button").forEach(button=>button.disabled=locked||options.length<2);
       $("#intelligenceNote").textContent=locked?"Finish the current message or model load before changing context.":
         contextDraftProfile==="fixed"?"This model has a fixed 4K context.":
-        contextDraftProfile==="ultra-code"?"Saved for Ultra Code’s next run. Close × to save.":"Close × to save and apply this context.";
+        contextDraftProfile==="ultra-code"?"Saved for Atlas 7.5 Code’s next run. Close × to save.":"Close × to save and apply this context.";
     }
   }
   function updateIntelligenceDraft(){
@@ -4708,7 +4717,7 @@ Local date/time: ${current}.${global}${local}`
     const index=contextDraftProfile==="fixed"?0:contextDraftPreferences[contextDraftProfile]||0;
     const option=options[index]||options[0];
     const label=contextLabel(option);
-    $("#intelligenceProfileTitle").textContent=contextDraftProfile==="ultra-code"?"Ultra Code":
+    $("#intelligenceProfileTitle").textContent=contextDraftProfile==="ultra-code"?"Atlas 7.5 Code":
       contextDraftProfile==="apex-ultra"?modelChoiceNames["apex-ultra"]:
       contextDraftProfile==="apex-pro"?modelChoiceNames["apex-pro"]:modelChoiceNames[state.modelChoice]||"Atlas";
     $("#intelligenceValue").textContent=label;
@@ -4741,7 +4750,7 @@ Local date/time: ${current}.${global}${local}`
     const note=$("#intelligenceNote");
     note.textContent=contextSettingsLocked()?"Finish the current message or model load before changing context.":
       contextDraftProfile==="fixed"?"This model has a fixed 4K context.":
-      contextDraftProfile==="ultra-code"?"Saved for Ultra Code’s next run. Close × to save.":"Close × to save and apply this context.";
+      contextDraftProfile==="ultra-code"?"Saved for Atlas 7.5 Code’s next run. Close × to save.":"Close × to save and apply this context.";
     updateIntelligenceControls();
   }
   function positionIntelligencePopover(){
@@ -4887,7 +4896,7 @@ Local date/time: ${current}.${global}${local}`
   function updateModelControls(){
     const mobile=isModelPickerMobile(),deviceMemory=Number(navigator.deviceMemory)||0,limitedPC=!window.atlasDesktop&&!mobile&&deviceMemory>0&&deviceMemory<8;
     const visibleRuntime=secondaryChatId===state.activeChatId&&secondaryAi?.choice===state.modelChoice?secondaryAi:ai.choice===state.modelChoice?ai:null;
-    state.loaded=Boolean(visibleRuntime?.engine);state.loading=Boolean(visibleRuntime?.loadingPromise);
+    state.loaded=Boolean(visibleRuntime?.engine);state.loading=state.poem3Loading||Boolean(visibleRuntime?.loadingPromise);
     if((mobile||limitedPC)&&(state.modelChoice.startsWith("apex-")||state.modelChoice==="ultra-code")){
       state.modelChoice="forge";state.qualityMode="balanced";state.fastMode=false;state.codingMode=false;persistSettings();
     }
@@ -4895,10 +4904,10 @@ Local date/time: ${current}.${global}${local}`
     state.contextWindowSize=contextWindowForChoice(state.modelChoice,state.contextPreferences,state.effort);
     if(visibleRuntime?.native&&visibleRuntime.nativeMeta?.choice===state.modelChoice)state.contextWindowSize=Math.min(state.contextWindowSize,visibleRuntime.nativeMeta.contextWindow);
     const fastToggle=$("#fastModeToggle"),isApex=state.modelChoice==="apex-ultra",isEffortModel=isApex||state.modelChoice==="ultra-code";
-    const imageMode=state.poem3Mode,imageAvailable=Boolean(navigator.gpu);
+    const imageMode=state.poem3Mode,imageAvailable=Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
     const poem3Button=modelPicker.querySelector('[data-model-choice="poem3"]');
     if(poem3Button){poem3Button.disabled=!imageAvailable;poem3Button.classList.toggle("model-option-disabled",!imageAvailable);}
-    const poem3Note=$("#poem3Note");if(poem3Note)poem3Note.textContent=!imageAvailable?"WebGPU is not available here":state.poem3Ready?"Ready on this device":state.poem3Loading?(state.poem3ProgressLabel||"Getting the image model ready…"):"Local · downloads several GB once";
+    const poem3Note=$("#poem3Note");if(poem3Note)poem3Note.textContent=!imageAvailable?"Image generation is not available here":state.poem3Ready?"Ready on this device":state.poem3Loading?(state.poem3ProgressLabel||"Getting the image model ready…"):"Local · downloads about 10.2 GB once";
     fastToggle.hidden=true;fastToggle.disabled=true;
     fastToggle.setAttribute("aria-pressed",String(isApex&&state.fastMode));
     intelligenceTrigger.hidden=true;
@@ -4942,21 +4951,21 @@ Local date/time: ${current}.${global}${local}`
     modelPicker.querySelector(`[data-model-choice="${selectedChoice}"]`)?.focus({preventScroll:true});
   }
   async function chooseModel(choice){
-    if(!modelChoiceNames[choice]||(isModelPickerMobile()&&(choice.startsWith("apex-")||choice==="ultra-code"))||(choice==="poem3"&&!navigator.gpu))return;
+    if(!modelChoiceNames[choice]||(isModelPickerMobile()&&(choice.startsWith("apex-")||choice==="ultra-code"))||(choice==="poem3"&&!(navigator.gpu||window.atlasDesktop?.imagePrepare)))return;
     const chat=activeChat(),backgroundBusy=hasReplyInOtherChat(chat.id),currentChoice=backgroundBusy?state.modelChoice:(chat.modelChoice||state.modelChoice);
     if(modelLoadSwitchPending){
       if(choice===currentChoice){closeModelPicker(true);return;}
       startModelLoadCooldownNotice();return;
     }
     if((state.generating&&state.pendingChatId===chat.id)||secondaryJob?.chatId===chat.id){modelPickerNotice.textContent="Let this chat finish its reply before switching models.";modelPickerNotice.hidden=false;return;}
-    if(backgroundBusy&&!modelChoicesWhileBackground().has(choice)){modelPickerNotice.textContent="While another reply runs, use Forge 2.1, Firefly 4.5, or its model unless it is Poem 3 or Apex 7.3.";modelPickerNotice.hidden=false;return;}
+    if(backgroundBusy&&!modelChoicesWhileBackground().has(choice)){modelPickerNotice.textContent="While another reply runs, use Atlas 7.5 Mini or the model already running.";modelPickerNotice.hidden=false;return;}
     if(state.titleGenerating||state.queued){modelPickerNotice.textContent="Let Atlas finish preparing the current reply before switching models.";modelPickerNotice.hidden=false;return;}
-    if(state.poem3Loading){modelPickerNotice.textContent="Let Poem 3 finish loading before switching models.";modelPickerNotice.hidden=false;return;}
+    if(state.poem3Loading){modelPickerNotice.textContent="Let Image 1.1 finish loading before switching models.";modelPickerNotice.hidden=false;return;}
     const interruptingModelLoad=state.loading&&Boolean(ai.loadingPromise);
     if(state.loading&&!interruptingModelLoad){modelPickerNotice.textContent="Atlas is preparing the model. Try switching again in a moment.";modelPickerNotice.hidden=false;return;}
     if(interruptingModelLoad&&choice!==currentChoice&&Date.now()<modelLoadInterruptCooldownUntil){startModelLoadCooldownNotice();return;}
     closeModelPicker(true);
-    const previousModelName=modelChoiceNames[currentChoice]||"Forge 2.1",wasPoem3=currentChoice==="poem3";
+    const previousModelName=modelChoiceNames[currentChoice]||"Atlas 7.5 Mini",wasPoem3=currentChoice==="poem3";
     chat.modelChoice=choice;state.modelChoice=choice;state.poem3Mode=choice==="poem3";persist();persistSettings();
     if(backgroundBusy){
       updateModelControls();if(choice!==currentChoice)recordModelSwitch(previousModelName,modelChoiceNames[choice]);

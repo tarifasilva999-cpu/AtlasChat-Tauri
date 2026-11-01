@@ -86,7 +86,7 @@ function archivePath(root, name) {
   if (target !== root && !target.startsWith(root + path.sep)) throw new Error('The runtime archive escaped its download folder.');
   return target;
 }
-async function unpackRuntime(archive, directory) {
+async function unpackRuntime(archive, directory, executable = 'llama-server') {
   const root = path.resolve(directory);
   await fs.mkdir(root, { recursive: true });
   let entries = [];
@@ -139,7 +139,8 @@ async function unpackRuntime(archive, directory) {
       await fs.symlink(path.relative(path.dirname(destination), linkTarget), destination);
     }
   }
-  const server = entries.find(entry => ['0'].includes(entry.type) && /^llama-server(?:\.exe)?$/.test(path.basename(entry.name)));
+  if (!/^[a-z0-9-]+$/i.test(executable)) throw new Error('Invalid runtime executable.');
+  const server = entries.find(entry => entry.type === '0' && [executable, executable + '.exe'].includes(path.basename(entry.name)));
   if (!server) throw new Error('The native download did not contain the Atlas model runner.');
   return archivePath(root, server.name);
 }

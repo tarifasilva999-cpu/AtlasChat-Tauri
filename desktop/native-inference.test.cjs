@@ -15,7 +15,10 @@ const { downloadVerified, archivePath, unpackRuntime } = require('./native-downl
 const TEST_ROOT = path.resolve(__dirname, '..');
 
 test('native choices keep one Apex weight set across efforts and cap context by physical RAM', () => {
-  assert.equal(modelFor('apex-ultra').files.length, 2);
+  assert.equal(modelFor('apex-ultra').repo, 'unsloth/Qwen3.5-4B-GGUF');
+  assert.equal(modelFor('ultra-code').files[0].name, 'gemma4-v2-Q4_K_M.gguf');
+  assert.equal(modelFor('forge').repo, 'openbmb/MiniCPM5-2B-GGUF');
+  assert.equal(modelFor('firefly'), modelFor('forge'));
   assert.equal(contextFor(32768, 8 * 1024 ** 3), 8192);
   assert.equal(contextFor(32768, 16 * 1024 ** 3), 16384);
   assert.equal(contextFor(32768, 32 * 1024 ** 3), 32768);
@@ -140,6 +143,12 @@ test('renderer adapter uses native chat and coding APIs without importing WebLLM
   assert.ok(events.some(event => event.type === 'done' && event.text === 'A plan'));
   const coding = await adapter.engine.chat.completions.create({ messages: [{ role: 'user', content: 'Write a small file.' }], stream: false, max_tokens: 7000 });
   assert.equal(coding.choices[0].message.content, 'A plan'); assert.equal(requests[1].kind, 'code');
+  const codeEngine = await adapter._createEngine({ id: 'atlas-native-code' });
+  assert.equal(adapter.nativeMeta.choice, 'ultra-code');
+  await codeEngine.unload();
+  const miniEngine = await adapter._createEngine({ id: 'atlas-native-mini' });
+  assert.equal(adapter.nativeMeta.choice, 'forge');
+  await miniEngine.unload();
   await adapter._dispose();
 });
 

@@ -1,6 +1,6 @@
 'use strict';
 
-// Official llama.cpp binaries and official Qwen weights. Pin both revisions and
+// Pin llama.cpp binaries and model revisions and
 // SHA-256 digests so an upstream update cannot silently change an installation.
 const RELEASE = 'b11429';
 const RUNTIMES = {
@@ -18,27 +18,19 @@ const RUNTIMES = {
 const file = (name, size, sha256) => ({ name, size, sha256 });
 const MODELS = {
   'apex-ultra': {
-    label: 'Apex 7.3', tier: 'apex', minimumGB: 8,
-    repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF', revision: 'bb5d59e06d9551d752d08b292a50eb208b07ab1f',
-    files: [
-      file('qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf', 3993201344, 'dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db'),
-      file('qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf', 689872288, '539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a')
-    ]
+    label: 'Atlas 7.5', tier: 'apex', minimumGB: 8,
+    repo: 'unsloth/Qwen3.5-4B-GGUF', revision: 'e87f176479d0855a907a41277aca2f8ee7a09523',
+    files: [file('Qwen3.5-4B-Q4_K_M.gguf', 2740937888, '00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4')]
   },
   'ultra-code': {
-    label: 'Apex 7.3 UltraCode', tier: 'ultra-code', minimumGB: 8,
-    repo: 'Qwen/Qwen2.5-Coder-7B-Instruct-GGUF', revision: '13fb94bfda8c8cf22497dc57b78f391a9acb426a',
-    files: [file('qwen2.5-coder-7b-instruct-q4_k_m.gguf', 4683073536, '509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c')]
+    label: 'Atlas 7.5 Code', tier: 'ultra-code', minimumGB: 12,
+    repo: 'yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF', revision: '190a31365a6b80a692349be34ccdac730cad4fe4',
+    files: [file('gemma4-v2-Q4_K_M.gguf', 7381381664, '0b9506cab36f7f818e34f9c0f5a3d6568d0b37100f3a3e1092e2eec3c4c96791')]
   },
   forge: {
-    label: 'Forge 2.1', tier: 'mobile', minimumGB: 3,
-    repo: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF', revision: '91cad51170dc346986eccefdc2dd33a9da36ead9',
-    files: [file('qwen2.5-1.5b-instruct-q4_k_m.gguf', 1117320736, '6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e')]
-  },
-  firefly: {
-    label: 'Firefly 4.5', tier: 'mobile', minimumGB: 2,
-    repo: 'Qwen/Qwen2.5-0.5B-Instruct-GGUF', revision: '9217f5db79a29953eb74d5343926648285ec7e67',
-    files: [file('qwen2.5-0.5b-instruct-q4_k_m.gguf', 491400032, '74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db')]
+    label: 'Atlas 7.5 Mini', tier: 'mobile', minimumGB: 4,
+    repo: 'openbmb/MiniCPM5-2B-GGUF', revision: '2079a22f3beaa4e306449978533478fe0522f4b3',
+    files: [file('MiniCPM5-2B-Q4_K_M.gguf', 1561318368, 'ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd')]
   }
 };
 function runtimeFor(platform, arch, cpu = false) {
@@ -51,6 +43,7 @@ function runtimeFor(platform, arch, cpu = false) {
     url: `https://github.com/ggml-org/llama.cpp/releases/download/${RELEASE}/${name}` };
 }
 function modelFor(choice) {
+  if (choice === 'firefly') choice = 'forge'; // Older saved preferences and CLI invocations.
   if (!Object.hasOwn(MODELS, choice)) throw new Error('Select an available Atlas model.');
   const model = MODELS[choice];
   if (!model) throw new Error('Select an available Atlas model.');

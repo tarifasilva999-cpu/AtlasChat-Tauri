@@ -5,9 +5,10 @@
     const bridge = window.atlasDesktop;
     if (!bridge?.inferenceLoad) throw new Error('Atlas desktop components are out of date. Close Atlas and reopen it from the updated folder.');
     const { state, contextWindowForChoice, isPlanCandidate, isCodeRequest, choice: initialChoice, runtimeId } = settings;
-    const legacyIds = { 'apex-ultra': 'Qwen2.5-7B-Instruct-q4f16_1-MLC',
-      'ultra-code': 'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC', forge: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', firefly: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC' };
-    const choiceFrom = (model, fallback) => model.choice || (/Coder/i.test(model.id) ? 'ultra-code' : /1\.5B/i.test(model.id) ? 'forge' : /0\.5B|Llama-3\.2-1B/i.test(model.id) ? 'firefly' : /7B/i.test(model.id) ? 'apex-ultra' : fallback);
+    const legacyIds = { 'apex-ultra': 'atlas-native-chat', 'ultra-code': 'atlas-native-code',
+      forge: 'atlas-native-mini', firefly: 'atlas-native-mini' };
+    const choiceFrom = (model, fallback) => model.choice ||
+      ({ 'atlas-native-chat': 'apex-ultra', 'atlas-native-code': 'ultra-code', 'atlas-native-mini': 'forge' })[model.id] || fallback;
     const identifier = prefix => `${prefix}:${crypto.randomUUID()}`;
     class DesktopAdapter extends Base {
       constructor(choice=initialChoice, id=runtimeId) {

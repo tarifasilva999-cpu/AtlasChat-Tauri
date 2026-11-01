@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Atlas",
   "short_name": "Atlas",
-  "description": "Private local AI powered by Apex 7.3.",
+  "description": "Private local AI powered by Atlas 7.5.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

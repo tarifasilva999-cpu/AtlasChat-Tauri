@@ -2,8 +2,8 @@
 (() => {
   'use strict';
   const bridge = window.atlasDesktop;
-  const CODER = 'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC';
-  const CODER_READY = 'atlas-ultra-code-ready-v1';
+  const CODER = 'atlas-native-code';
+  const CODER_READY = 'atlas-75-code-ready-v1';
   const PREF = 'atlas-coding-preferences-v1';
   const PROJECT_MODELS = new Set(['firefly', 'forge', 'apex-ultra', 'ultra-code']);
   let hooks, active, bundleRestore = () => {};
@@ -42,8 +42,8 @@
   }
   function requestCoderDownload() {
     return new Promise(resolve => {
-      const { layer, dialog } = coderPanel('Download Ultra Code?',
-        'This optional coding model downloads once (about 4.3 GB) and needs extra available memory. Atlas can use it for demanding project tasks.');
+      const { layer, dialog } = coderPanel('Download Atlas 7.5 Code?',
+        'This optional coding model downloads once (about 7.4 GB) and needs extra available memory. Atlas can use it for demanding project tasks.');
       let settled = false;
       const finish = choice => {
         if (settled) return; settled = true;
@@ -52,8 +52,8 @@
       };
       const onKeydown = event => { if (event.key === 'Escape') finish('cancel'); };
       const actions = node('div', undefined, 'coding-dialog-actions');
-      const load = node('button', 'Download Ultra Code', 'coding-dialog-primary'); load.type = 'button'; load.onclick = () => finish('coder');
-      const standard = node('button', 'Use Apex 7.3 Ultra'); standard.type = 'button'; standard.onclick = () => finish('standard');
+      const load = node('button', 'Download Atlas 7.5 Code', 'coding-dialog-primary'); load.type = 'button'; load.onclick = () => finish('coder');
+      const standard = node('button', 'Use Atlas 7.5'); standard.type = 'button'; standard.onclick = () => finish('standard');
       const cancelButton = node('button', 'Cancel'); cancelButton.type = 'button'; cancelButton.onclick = () => finish('cancel');
       actions.append(load, standard, cancelButton); dialog.append(actions);
       layer.addEventListener('pointerdown', event => { if (event.target === layer) finish('cancel'); });
@@ -61,7 +61,7 @@
       load.focus();
     });
   }
-  function showCoderProgress(info = {}, title = 'Downloading Ultra Code', detail = 'Preparing the model download on this device.', cancelable = true) {
+  function showCoderProgress(info = {}, title = 'Downloading Atlas 7.5 Code', detail = 'Preparing the model download on this device.', cancelable = true) {
     const { dialog } = coderPanel(title, detail);
     const status = node('div', undefined, 'coding-download-status');
     coderPercent = node('span', 'Preparing…'); coderDetail = node('span', 'The model will be saved for later use.');
@@ -101,7 +101,7 @@
     return chat?.projectId || [...(chat?.messages || [])].reverse().find(message => message.projectRunId)?.projectRunId || null;
   }
   function projectModelName(choice) {
-    return ({ firefly: 'Firefly 4.5', forge: 'Forge 2.1', 'apex-ultra': 'Apex 7.3', 'ultra-code': 'Apex 7.3 UltraCode' })[choice] || 'Atlas';
+    return ({ firefly: 'Atlas 7.5 Mini', forge: 'Atlas 7.5 Mini', 'apex-ultra': 'Atlas 7.5', 'ultra-code': 'Atlas 7.5 Code' })[choice] || 'Atlas';
   }
   function shouldRun(text, chat = hooks?.getChat?.()) {
     const choice = chat?.modelChoice || hooks?.state?.modelChoice;
@@ -181,7 +181,7 @@
     if (previous === CODER) return true;
     if (!forceCoder && !preferences.coder) return false;
     if (!forceCoder) {
-      await stage('Selecting model', 'Checking whether Ultra Code fits this project task.');
+      await stage('Selecting model', 'Checking whether Atlas 7.5 Code fits this project task.');
       if (active.task?.complexity === 'small') return false;
     }
     const installed = localStorage.getItem(CODER_READY) === '1';
@@ -194,7 +194,7 @@
     active.baseModelId = previous || active.baseModelId;
     active.baseModelVariant = hooks.ai.variant || active.baseModelVariant;
     active.baseModelTier = hooks.state.activeModelTier || active.baseModelTier;
-    showCoderProgress({}, installed ? 'Loading Ultra Code' : 'Downloading Ultra Code',
+    showCoderProgress({}, installed ? 'Loading Atlas 7.5 Code' : 'Downloading Atlas 7.5 Code',
       installed ? 'Loading the downloaded model on this device.' : 'Preparing the model download on this device.');
     const priorProgress = hooks.ai.onCodingProgress;
     hooks.ai.onCodingProgress = updateCoderProgress;
@@ -219,7 +219,7 @@
       });
       hooks.ai.engine = await abortable(loading);
       hooks.ai.modelId = CODER;
-      hooks.ai.variant = 'Qwen2.5-Coder 7B';
+      hooks.ai.variant = 'Atlas 7.5 Code';
       stopped();
       active.coderSelected = true;
       try { localStorage.setItem(CODER_READY, '1'); } catch {}
@@ -254,7 +254,7 @@
     if (run.baseModelRestoring) return;
     run.baseModelRestoring = true;
     const priorProgress = hooks.ai.onCodingProgress;
-    showCoderProgress({}, 'Restoring Apex 7.3 Ultra', 'Loading the chat model for your next message.', false);
+    showCoderProgress({}, 'Restoring Atlas 7.5', 'Loading the chat model for your next message.', false);
     hooks.ai.onCodingProgress = updateCoderProgress;
     run.loadingModel = true;
     try {
@@ -273,7 +273,7 @@
     } catch {
       hooks.state.loaded = !!hooks.ai.engine;
       hooks.state.loading = false;
-      hooks.toast('Apex 7.3 Ultra could not be reloaded after the coding task. Use the model picker to reload it.');
+      hooks.toast('Atlas 7.5 could not be reloaded after the coding task. Use the model picker to reload it.');
     } finally {
       run.loadingModel = false;
       run.baseModelRestoring = false;
@@ -516,7 +516,7 @@
         await command('SET_MANIFEST',{...plan,baseRevision:active.revision});
       }
       const usingCoder = verificationOnly ? hooks.ai.modelId===CODER : await selectModel(request, forceCoder);
-      message.modelName = usingCoder ? 'Apex 7.3 UltraCode' : projectModelName(active.chat.modelChoice || hooks.state.modelChoice);
+      message.modelName = usingCoder ? 'Atlas 7.5 Code' : projectModelName(active.chat.modelChoice || hooks.state.modelChoice);
       refresh(await bridge.model({ id: active.id, model: hooks.ai.modelId || 'unknown' }));
       hooks.persist(); hooks.render();
       await stage('Planning',verificationOnly?'Checking the current project files.':String(plan.summary || brief).slice(0,600));
@@ -624,7 +624,7 @@
     const open = new Set([...container.querySelectorAll('details[open]')].map(d => d.dataset.key));
     container.replaceChildren();
     container.append(node('h3', run.title), node('p', statusText(run), 'coding-status'),
-      node('small', run.actualModel === CODER ? 'Apex 7.3 Ultra Code' : 'Apex 7.3 Ultra', 'coding-model'));
+      node('small', run.actualModel === CODER ? 'Atlas 7.5 Code' : 'Atlas 7.5', 'coding-model'));
     if(container.dataset.taskError)container.append(node('p',container.dataset.taskError,'coding-status'));
     const list = node('details'); list.dataset.key = 'files'; list.open = open.has('files');
     list.append(node('summary', run.files.length + ' files'));
@@ -687,7 +687,7 @@
       preview.onclick = () => window.AtlasCoding.run('Run and preview this project, fixing errors first.',null,false,true,true); actions.append(preview);
     }
     const runButton=node('button','Run and repair');runButton.disabled=!!active||!run.files.length||hooks.state.modelChoice!=='apex-ultra'||!hooks.ai.engine;
-    if(runButton.disabled&&!active&&run.files.length)runButton.title='Load Apex 7.3 Ultra to run checks and repair errors.';
+    if(runButton.disabled&&!active&&run.files.length)runButton.title='Load Atlas 7.5 to run checks and repair errors.';
     runButton.onclick=()=>window.AtlasCoding.run('Run this project and fix any errors found.',null,false,true);
     const workspaceButton=node('button','Open project workspace');workspaceButton.type='button';
     workspaceButton.onclick=()=>openProjectWorkspace(run,'files');
@@ -1251,7 +1251,7 @@
       if (message.content === 'Coding model selection cancelled.') {
         const row = node('div', undefined, 'coding-cancel-card');
         row.append(node('span', message.content));
-        const download = node('button', 'Download Ultra Code'); download.type = 'button';
+        const download = node('button', 'Download Atlas 7.5 Code'); download.type = 'button';
         download.dataset.codingRetry = 'true';
         if (pendingCoderLoad) { download.disabled = true; download.title = 'Waiting for the canceled model load to finish.'; }
         download.onclick = () => run(message.codingRequest || '', message, true);
@@ -1331,13 +1331,13 @@
     importZip.onclick=()=>{if(active){hooks.toast('Finish or stop the active task before creating a project.');return;}document.querySelector('#settingsModal .panel-close')?.click();createSidebarProject(true);};
     projectActions.append(create,importZip);section.append(projectActions,node('h4','Project preferences','coding-settings-heading'));
     const preferenceList=node('div',undefined,'coding-preference-list');
-    for (const [key, label] of [['research', 'Look up documentation online'], ['coder', 'Offer the optional Ultra Code model']]) {
+    for (const [key, label] of [['research', 'Look up documentation online'], ['coder', 'Offer the optional Atlas 7.5 Code model']]) {
       const row = node('label',undefined,'coding-setting-row'), input = node('input'); input.type = 'checkbox'; input.checked = preferences[key];
       input.dataset.codingPreference = key;
       input.onchange = () => { preferences[key] = input.checked; savePreferences(); };
       row.append(node('span',label,'coding-setting-label'),input,node('span',undefined,'coding-setting-toggle')); preferenceList.append(row);
     }
-    section.append(preferenceList,node('p', 'Ultra Code downloads about 4.3 GB once and needs Docker. Normal project checks run without network access.','coding-settings-note'));
+    section.append(preferenceList,node('p', 'Atlas 7.5 Code downloads about 7.4 GB once and needs Docker. Normal project checks run without network access.','coding-settings-note'));
     const restore = node('button',undefined,'coding-settings-restore'); restore.type = 'button';
     restore.append(projectIcon('M12 4v11m0-11L8 8m4-4 4 4M5 14v5h14v-5'),node('span','Restore desktop bundle'));
     restore.onclick = restoreBundle;

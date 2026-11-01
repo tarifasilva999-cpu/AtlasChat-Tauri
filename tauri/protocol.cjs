@@ -4,6 +4,7 @@ const { EventEmitter } = require('node:events');
 const pending = new Map(), handlers = new Map(), windows = new Map(), protocols = new Map();
 let next = 0, shuttingDown = false;
 const send = value => process.stdout.write(JSON.stringify(value) + '\n');
+const imageRuntime = new (require('./image-runtime.cjs').ImageRuntime)(require('node:path').join(process.env.ATLAS_DATA_DIR, 'image-1.1'), value => send({ type: 'inference', value }));
 console.log = (...args) => console.error(...args);
 function native(name, value) {
   const id = ++next;
@@ -15,6 +16,7 @@ app.whenReady = () => Promise.resolve();
 app.quit = () => { void shutdown(); };
 async function shutdown() {
   if (shuttingDown) return; shuttingDown = true;
+  imageRuntime.cancel();
   app.emit('before-quit');
   try { await Promise.all([require('./models.cjs').unloadAll(), app.cleanup?.()]); } finally { process.exit(0); }
 }
@@ -72,6 +74,9 @@ readline.createInterface({ input: process.stdin, crlfDelay: Infinity }).on('line
     }
     if (message.name === '_shutdown') { await shutdown(); return; }
     if (message.name === 'poemCacheInfo') { send({type:'result',id:message.id,value:await require('./poem-server.cjs').info()}); return; }
+    if (message.name === 'imagePrepare') { send({type:'result',id:message.id,value:await imageRuntime.prepare()}); return; }
+    if (message.name === 'imageGenerate') { send({type:'result',id:message.id,value:await imageRuntime.generate(message.value)}); return; }
+    if (message.name === 'imageCancel') { imageRuntime.cancel(); send({type:'result',id:message.id,value:true}); return; }
     if (message.name === '_previewAsset') {
       const handler = protocols.get('atlas-preview:'+new URL(message.value).hostname); if (!handler) throw Error('Preview unavailable');
       const response = await handler({ url: message.value });

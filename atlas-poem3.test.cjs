@@ -11,7 +11,7 @@ function deferred() {
 
 // Small browser doubles: exercise progress/completion/cancellation without opening
 // an app, downloading models, or running a GPU job.
-function setup({ reduced = false, decode = Promise.resolve(), save, gpuDone = Promise.resolve() } = {}) {
+function setup({ reduced = false, decode = Promise.resolve(), save, gpuDone = Promise.resolve(), native } = {}) {
   const observers = [], frames = new Map(), timers = new Map();
   let id = 0;
   class Node extends EventTarget {
@@ -40,12 +40,13 @@ function setup({ reduced = false, decode = Promise.resolve(), save, gpuDone = Pr
   document.createElement = tag => new Node(tag);
   document.documentElement.dataset.reduceMotion = String(reduced);
   const window = new Node('window'); window.indexedDB = {};
+  if (native) window.atlasDesktop = native;
   const media = new EventTarget(); media.matches = false;
   const engine = { generate: async () => ({ blob: new Blob(['image']), width: 512, height: 512 }) };
   const device = { queue: { onSubmittedWorkDone: () => gpuDone }, destroy() {} };
   let emit;
   const context = {
-    window, document, Blob, DOMException, AbortController, EventTarget, console,
+    window, document, Blob, DOMException, AbortController, EventTarget, console, atob,
     performance: { now: () => 100 }, devicePixelRatio: 2, matchMedia: () => media,
     ResizeObserver: Observer, MutationObserver: Observer,
     Image: class { decode() { return decode; } },
@@ -78,6 +79,21 @@ function setup({ reduced = false, decode = Promise.resolve(), save, gpuDone = Pr
     detail: copy.children[4], observers, frames, timers, document, media, engine,
     emit: event => emit(event) };
 }
+
+test('native image pipeline forwards progress and saves the generated image', async () => {
+  let listener, cancelled = 0;
+  const native = {
+    onInference: fn => { listener = fn; return () => { listener = null; }; },
+    imagePrepare: async () => { listener({ type: 'image-progress', stage: 'download', detail: { loaded: 1, total: 2 } }); },
+    imageGenerate: async value => { assert.equal(value.prompt, 'a tree'); return { png: btoa('png data'), width: 512, height: 512 }; },
+    imageCancel: async () => { cancelled++; }
+  };
+  const s = setup({ native }), events = [];
+  const result = await s.api.generate('a tree', { onProgress: event => events.push(event.stage) });
+  assert.equal(result.id, 'image-id');
+  assert.ok(events.includes('download')); assert.ok(events.includes('image-saved'));
+  await s.api.unload(); assert.equal(cancelled, 1); assert.equal(listener, null);
+});
 
 test('real nested steps advance monotonically; downloads and mobile segments cannot claim completion', () => {
   const s = setup();

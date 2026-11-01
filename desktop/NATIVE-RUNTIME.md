@@ -1,73 +1,18 @@
-# Atlas native desktop inference
+# AtlasChat Tauri local models
 
-Run the source app using the existing `npm run desktop` command. Close any older
-Atlas window first. There is no new development dependency or compilation step.
+The Tauri app uses a supervised llama.cpp runner for chat and a separate stable-diffusion.cpp runner for Image 1.1. Model downloads and runner archives are pinned to revisions and verified with SHA-256. Downloads resume after interruption. The previous Electron and browser installations have separate data and are unchanged.
 
-Electron chat and project coding now use a supervised, native llama.cpp process.
-Browser chat continues to use WebLLM. The renderer exchanges messages through a
-fixed preload API; it cannot supply executables, model paths, URLs, or commands.
-The local server binds only to 127.0.0.1, uses a random session key, and has its
-built-in web interface disabled. Chats are not sent to the download hosts.
-
-## First desktop launch
-
-Atlas downloads official precompiled llama.cpp **b11429** binaries and the
-selected model into `native-ai` inside Electron's user data directory. These
-downloads are separate from the existing browser WebLLM cache. Every archive and
-weight file is pinned to a revision and verified using SHA-256 before use.
-Interrupted weight downloads resume; a completed transfer does not mean the
-model is ready. Atlas first checks the files, starts the process, and confirms
-that it produces a short reply.
-
-| Atlas choice | Desktop weights | Download size |
+| Choice | Weights | Approximate download |
 | --- | --- | --- |
-| Apex 7.3 | Qwen2.5 7B Instruct, Q4_K_M | 4.68 GB |
-| Apex 7.3 UltraCode | Qwen2.5 Coder 7B Instruct, Q4_K_M | 4.68 GB |
-| Forge 2.1 | Qwen2.5 1.5B Instruct, Q4_K_M | 1.12 GB |
-| Firefly 4.5 | Qwen2.5 0.5B Instruct, Q4_K_M | 0.49 GB |
+| Atlas 7.5 | Qwen3.5-4B, Unsloth Q4_K_M | 2.74 GB |
+| Atlas 7.5 Code | Gemma 4 12B agentic, Q4_K_M | 7.38 GB |
+| Atlas 7.5 Mini | MiniCPM5-2B, Q4_K_M | 1.56 GB |
+| Image 1.1 | Qwen Image 2.1 Turbo: AtomicChat encoder and denoiser, plus Qwen Image 2.1 VAE | 10.16 GB |
 
-Sizes above use decimal GB. Both shards of Apex's split model must be present.
-No larger Apex model is being promised by this change; it changes how the
-existing desktop models execute. Effort levels retain the same weights and
-change output budgets and requested context. Native chat honors those budgets
-without the old 1,100-token clamp or an unlimited continuation loop.
+The text models use llama.cpp b11429, with Vulkan or Metal where supported and a CPU retry. Image 1.1 uses a separate pinned Windows x64 Vulkan build of stable-diffusion.cpp and generates 512-pixel images using the Turbo eight-step schedule. It requires a compatible Vulkan GPU and substantial system/GPU memory. The model files, runtime and working memory add to the download size. Atlas does not substitute a different model when the requested weights cannot run.
 
-## Hardware and recovery
+Existing Firefly and Forge chat selections map to Mini. Old messages and saved images remain in their existing storage. Stop cancels a model transfer or an active image process; interrupted transfers can resume.
 
-Windows x64/ARM64 and Linux x64/ARM64 try Vulkan; macOS x64/ARM64 tries Metal.
-The runner chooses how many layers fit on the GPU. If that path cannot start,
-Atlas retries the same model with CPU execution. The CPU path may be slower.
-Linux artifacts are official Ubuntu builds and require compatible system
-libraries. Unsupported architectures produce a visible error.
+The current changes have focused automated checks with mocked runners. The new multi-gigabyte downloads, real model replies, real image output, hardware requirements, packaged app and visual behavior have not yet been validated. Historical migration results in TESTING.md concern the older models.
 
-Context is capped conservatively using real physical RAM: up to 8K below 12 GB,
-16K from 12 GB, and 32K from 24 GB. Effort requests smaller windows when applicable.
-Atlas reads the runner's actual context after hardware fitting, so a reduced
-window is reflected in chat and coding limits. These are capacity heuristics,
-not a benchmark or a guarantee that every machine
-can load the chosen weights. Atlas does not silently substitute different Apex
-weights when memory is insufficient.
-
-Main-process deadlines cover download stalls, setup, model startup, verification,
-first-token stalls and the whole reply. Stop aborts downloads or generation and
-terminates the inference process. Closing Atlas also terminates the runner. After
-a reset, the next Send loads the model again from the verified local files.
-
-The settings information panel reports physical RAM, actual native acceleration,
-and the effective context window. Internal diagnostic details are available via
-the narrow `inferenceInfo` bridge for debugging.
-
-## Sources and verification
-
-- [Pinned llama.cpp binaries and license (MIT)](https://github.com/ggml-org/llama.cpp/releases/tag/b11429)
-- [llama.cpp server protocol](https://github.com/ggml-org/llama.cpp/tree/b11429/tools/server)
-- [Official Qwen2.5 7B model](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF)
-- [Official Qwen2.5 Coder 7B model](https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF)
-- [Official Qwen2.5 1.5B model](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF)
-- [Official Qwen2.5 0.5B model](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF)
-
-Focused tests use fake network responses and processes to check resume/integrity,
-archive confinement, streamed output, deadlines, cancellation, leases and the
-chat/coding adapter. They do not download weights, launch Electron or prove
-hardware performance. Native downloads, driver behavior, packaged execution and
-visual layout still require a real desktop run.
+Sources: [Qwen3.5 4B](https://huggingface.co/Qwen/Qwen3.5-4B), [Gemma 4 Code](https://huggingface.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF), [MiniCPM5](https://huggingface.co/openbmb/MiniCPM5-2B), [Image 1.1 encoder and required components](https://huggingface.co/AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF), and [stable-diffusion.cpp Qwen Image 2.1](https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/qwen_image_2.1.md).

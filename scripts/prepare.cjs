@@ -42,7 +42,7 @@ async function main() {
   if(!backendDesktop.startsWith(path.join(root,'src-tauri/resources')+path.sep))throw Error('Unsafe backend staging path');
   await fs.rm(backendDesktop,{recursive:true,force:true});
   await fs.cp(path.join(root,'desktop'),backendDesktop,{recursive:true,filter:source=>!/(?:\.test\.cjs|\.integration\.cjs|[\\/]fixtures|[\\/]preload\.cjs|[\\/]cli\.cjs)$/.test(source)});
-  await fs.cp(path.join(root,'tauri'),path.join(backend,'tauri'),{recursive:true});
+  await fs.cp(path.join(root,'tauri'),path.join(backend,'tauri'),{recursive:true,filter:source=>!source.endsWith('.test.cjs')});
   let mainSource=await fs.readFile(path.join(root,'desktop/main.cjs'),'utf8');
   mainSource=mainSource.replace("require('electron')","require('../tauri/protocol.cjs')").replace("require('./native-inference.cjs')","require('../tauri/models.cjs')");
   mainSource=mainSource.replace('runtime = new NativeInference({ directory: inferenceDirectory,',"if (inferenceRuntimes.size >= 2) throw new Error('Only one secondary model can be loaded.');\n    runtime = new NativeInference({ directory: inferenceDirectory,");

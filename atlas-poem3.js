@@ -11,6 +11,7 @@
   let progressHandler = null;
   let progressCycle = 0;
   let databaseTask = null;
+  let nativeUnsubscribe = null;
   const imageUrls = new Map();
   const GENERATION_STEPS = 4;
 
@@ -18,7 +19,7 @@
   // saved image, decoded preview. This is completion progress, never a time estimate.
   function generationProgress() {
     let completed = 0;
-    let label = "Getting Poem 3 ready…";
+    let label = "Getting Image 1.1 ready…";
     const total = GENERATION_STEPS + 4;
     return event => {
       const stage = event?.stage;
@@ -55,10 +56,10 @@
 
   function progressInfo(event) {
     const stage = String(event?.stage || event?.type || event?.phase || "").toLowerCase();
-    let label = "Getting Poem 3 ready…";
-    if (/download|fetch/.test(stage)) label = "Downloading Poem 3…";
+    let label = "Getting Image 1.1 ready…";
+    if (/download|fetch/.test(stage)) label = "Downloading Image 1.1…";
     else if (/cache|opfs|read/.test(stage)) label = "Opening the saved image model…";
-    else if (/weight|load|upload|engine|device/.test(stage)) label = "Loading Poem 3…";
+    else if (/weight|load|upload|engine|device/.test(stage)) label = "Loading Image 1.1…";
     else if (/token|text|prompt|embed/.test(stage)) label = "Reading your prompt…";
     else if (/denois|transform|sample|step|generat/.test(stage)) label = "Creating your image…";
     else if (/decode|vae|finish/.test(stage)) label = "Finishing the image…";
@@ -109,6 +110,22 @@
 
   async function loadRuntime(onProgress) {
     if (onProgress) { progressHandler = onProgress; progressCycle++; }
+    if (window.atlasDesktop?.imagePrepare) {
+      if (!runtimeTask) {
+        const cycle = runtimeCycle;
+        nativeUnsubscribe = window.atlasDesktop.onInference(event => {
+          if (event.type === 'image-progress' && cycle === runtimeCycle) progressHandler?.(event);
+        });
+        runtimeTask = window.atlasDesktop.imagePrepare().then(() => {
+          if (cycle !== runtimeCycle) throw new DOMException('Image creation stopped.', 'AbortError');
+          runtime = { native: true }; return runtime;
+        }).catch(error => {
+          if (cycle === runtimeCycle) { runtimeTask = null; runtime = null; nativeUnsubscribe?.(); nativeUnsubscribe = null; }
+          throw error;
+        });
+      }
+      return runtimeTask;
+    }
     if (!runtimeTask) {
       const cycle = runtimeCycle;
       runtimeTask = (async () => {
@@ -175,6 +192,8 @@
     runtimeTask = null;
     progressHandler = null;
     progressCycle++;
+    nativeUnsubscribe?.(); nativeUnsubscribe = null;
+    if (window.atlasDesktop?.imageCancel) await window.atlasDesktop.imageCancel().catch(() => {});
     try { if (typeof engine?.destroy === "function") await engine.destroy(); }
     finally { device?.destroy(); }
   }
@@ -224,7 +243,7 @@
     const width = Number(result?.width || image?.width);
     const height = Number(result?.height || image?.height);
     if (!pixels || !Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 4096 * 4096) {
-      throw new Error("Poem 3 returned an image Atlas could not read.");
+      throw new Error("Image 1.1 returned an image Atlas could not read.");
     }
 
     const canvas = document.createElement("canvas");
@@ -246,8 +265,10 @@
     const engine = await withSignal(loadRuntime(options.onProgress), options.signal);
     if (options.signal?.aborted) throw new DOMException("Image creation stopped.", "AbortError");
     progressHandler = options.onProgress || progressHandler;
+    const abortNative = () => { if (engine.native) void window.atlasDesktop.imageCancel(); };
+    options.signal?.addEventListener('abort', abortNative, { once: true });
     try {
-      const result = await engine.generate({
+      const result = engine.native ? await window.atlasDesktop.imageGenerate({ prompt: cleanPrompt }) : await engine.generate({
         prompt: cleanPrompt,
         steps: GENERATION_STEPS,
         width: options.width || 512,
@@ -256,7 +277,9 @@
       });
       if (options.signal?.aborted) throw new DOMException("Image creation stopped.", "AbortError");
       options.onProgress?.({ stage: "image-rendered" });
-      const blob = await pixelsToBlob(result);
+      const blob = engine.native
+        ? new Blob([Uint8Array.from(atob(result.png), c => c.charCodeAt(0))], { type: 'image/png' })
+        : await pixelsToBlob(result);
       if (options.signal?.aborted) throw new DOMException("Image creation stopped.", "AbortError");
       const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       await saveImage(id, blob);
@@ -264,6 +287,7 @@
       options.onProgress?.({ stage: "image-saved" });
       return { id, width: Number(result?.width || result?.image?.width) || 512, height: Number(result?.height || result?.image?.height) || 512 };
     } finally {
+      options.signal?.removeEventListener('abort', abortNative);
       if (progressHandler === options.onProgress) { progressHandler = null; progressCycle++; }
     }
   }
@@ -279,12 +303,12 @@
     return url;
   }
 
-  async function download(id, filename = "poem-3-image.webp") {
+  async function download(id, filename = "atlas-image-1.1.png") {
     const blob = await readImage(id);
     if (!blob) throw new Error("This image is no longer available on this device.");
     const url = URL.createObjectURL(blob);
     const extension = blob.type === "image/png" ? "png" : "webp";
-    const downloadName = String(filename || "poem-3-image.webp").replace(/\.(?:png|webp)$/i, "") + "." + extension;
+    const downloadName = String(filename || "atlas-image-1.1.png").replace(/\.(?:png|webp)$/i, "") + "." + extension;
     const link = document.createElement("a");
     link.href = url;
     link.download = downloadName;
@@ -330,7 +354,7 @@
     copy.className = "poem3-generation-copy";
     const kicker = document.createElement("span");
     kicker.className = "poem3-generation-kicker";
-    kicker.textContent = "Poem 3 / Image study";
+    kicker.textContent = "Image 1.1 / Image study";
     const label = document.createElement("span");
     label.className = "poem3-generation-label";
     label.setAttribute("role", "status");

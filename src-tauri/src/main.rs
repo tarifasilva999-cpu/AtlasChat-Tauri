@@ -8,7 +8,7 @@ use std::{path::PathBuf, sync::Arc};
 use tauri::{Manager, WebviewWindow, WebviewWindowBuilder, WebviewUrl};
 use base64::Engine;
 
-const OPERATIONS: &[&str] = &["info","create","inferenceInfo","inferenceLoad","inferenceComplete","inferenceCancel","inferenceUnload","read","source","save","event","model","check","cancel","finish","exportProject","preview","exportBackup","importBackup","research","chooseCoder","projects","deleteProject","projectCommand","importProject"];
+const OPERATIONS: &[&str] = &["info","create","inferenceInfo","inferenceLoad","inferenceComplete","inferenceCancel","inferenceUnload","imagePrepare","imageGenerate","imageCancel","read","source","save","event","model","check","cancel","finish","exportProject","preview","exportBackup","importBackup","research","chooseCoder","projects","deleteProject","projectCommand","importProject"];
 fn trusted(window: &WebviewWindow) -> Result<(),String> {
     let url = window.url().map_err(|e|e.to_string())?;
     if window.label() != "main" || !matches!(url.path(),"/Atlas-CHAT.html"|"/index.html") ||

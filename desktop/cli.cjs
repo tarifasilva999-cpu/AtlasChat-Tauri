@@ -10,13 +10,18 @@ const { NativeInference } = require('./native-inference.cjs');
 const { MODELS } = require('./native-catalog.cjs');
 
 const MODEL_ALIASES = {
+  atlas: 'apex-ultra',
+  'atlas-7.5': 'apex-ultra',
   apex: 'apex-ultra',
   'apex-ultra': 'apex-ultra',
   code: 'ultra-code',
   ultracode: 'ultra-code',
   'ultra-code': 'ultra-code',
+  mini: 'forge',
+  'atlas-7.5-mini': 'forge',
+  'atlas-7.5-code': 'ultra-code',
   forge: 'forge',
-  firefly: 'firefly'
+  firefly: 'forge'
 };
 
 function modelChoice(value) {
@@ -65,7 +70,7 @@ function formatSize(bytes) {
 
 function modelRows() {
   return Object.entries(MODELS).map(([key, model]) => {
-    const aliases = key === 'apex-ultra' ? 'apex' : key === 'ultra-code' ? 'ultracode' : key;
+    const aliases = key === 'apex-ultra' ? 'atlas' : key === 'ultra-code' ? 'code' : 'mini';
     const size = model.files.reduce((total, file) => total + file.size, 0);
     return `  ${aliases.padEnd(12)} ${model.label}  (${formatSize(size)})`;
   }).join('\n');
@@ -77,7 +82,7 @@ function printHelp() {
     `  npm run chat [-- --model <name>] [--yes]\n` +
     `  node desktop/cli.cjs [--model <name>] [--yes]\n\n` +
     `Options:\n` +
-    `  -m, --model <name>  Choose the local model (default: forge)\n` +
+    `  -m, --model <name>  Choose the local model (default: mini)\n` +
     `  -y, --yes           Skip the model preparation confirmation\n` +
     `  -h, --help          Show this help\n\n` +
     `Models:\n${modelRows()}\n\n` +
