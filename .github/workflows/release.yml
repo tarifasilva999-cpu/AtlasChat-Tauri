@@ -2,6 +2,8 @@ name: Release AtlasChat Tauri
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -10,6 +12,7 @@ permissions:
 
 jobs:
   publish-windows:
+    if: github.ref_type == 'tag'
     runs-on: windows-latest
     steps:
       - name: Check out source
@@ -51,6 +54,89 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: AtlasChat ${{ github.ref_name }}
           releaseBody: 'Windows release for AtlasChat Tauri.'
+          releaseDraft: false
+          projectPath: .
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+  commits-to-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      commits: ${{ steps.commits.outputs.commits }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: List new main-branch commits
+        id: commits
+        shell: pwsh
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if ($env:BEFORE -match '^0+$') {
+            $commits = @($env:AFTER)
+          } else {
+            $commits = @(git rev-list --first-parent --reverse "$env:BEFORE..$env:AFTER")
+            if ($LASTEXITCODE -ne 0) { throw 'Could not list the pushed commits.' }
+          }
+          if ($commits.Count -eq 0 -or $commits.Count -gt 256) { throw 'Expected between 1 and 256 new commits.' }
+          $json = ConvertTo-Json -InputObject $commits -Compress
+          "commits=$json" >> $env:GITHUB_OUTPUT
+
+  publish-commit:
+    needs: commits-to-release
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.commits-to-release.outputs.commits) }}
+    steps:
+      - name: Check out commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.commit }}
+          fetch-depth: 0
+
+      - name: Check out release tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: .release-automation
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Assign commit release version
+        id: version
+        run: node .release-automation/scripts/commit-release-version.cjs
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build and publish commit release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: AtlasChat ${{ steps.version.outputs.tag }}
+          releaseBody: 'Windows release for commit ${{ matrix.commit }}.'
+          releaseCommitish: ${{ matrix.commit }}
           releaseDraft: false
           projectPath: .
           uploadUpdaterJson: true

@@ -8,7 +8,7 @@
     "prepare:desktop": "node scripts/prepare.cjs",
     "build:desktop": "tauri build",
     "build:exe": "tauri build --no-bundle",
-    "test": "node --test atlas-updates.test.cjs atlas-poem3.test.cjs desktop/*.test.cjs migration/*.test.cjs tauri/*.test.cjs",
+    "test": "node --test atlas-updates.test.cjs atlas-poem3.test.cjs desktop/*.test.cjs migration/*.test.cjs tauri/*.test.cjs scripts/*.test.cjs",
     "check:core": "node --test desktop/core.test.cjs desktop/projects.test.cjs desktop/runner.test.cjs desktop/workflow.test.cjs",
     "migrate:data": "node migration/export.cjs",
     "chat": "node desktop/cli.cjs"

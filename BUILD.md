@@ -1,5 +1,9 @@
 # Build and run AtlasChat
 
+## GitHub releases
+
+Each new commit pushed to `main` gets a signed Windows release through `.github/workflows/release.yml`. A push containing multiple first-parent commits schedules a release for each. The build uses the checked-in major/minor version and adds the number of commits since the `v1.0.0` baseline to its patch version; CI applies that version to all Tauri, Cargo and npm version fields in the build checkout. The source version files are not changed by CI. The first commit after `v1.0.0` therefore builds as `v1.0.1`. Pushed version tags also retain the existing manual release workflow and must match the checked-in app version. GitHub repository signing secrets must remain configured for updater artifacts.
+
 This folder is the migration copy. `../Atlas` remains the original Electron application. Git and GitHub accounts are not required.
 
 ## Windows prerequisites
