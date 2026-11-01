@@ -231,3 +231,31 @@ test('browser and desktop entries share generation hooks and remain syntacticall
     assert.match(current, /createGenerationOverlay/); assert.match(current, /await overlay\.finish/);
   }
 });
+
+test('native image sizes preserve all selected aspect ratios and output edges in both entries', () => {
+  let expected;
+  const formats = {};
+  for (const file of ['index.html', 'Atlas-CHAT.html']) {
+    const source = fs.readFileSync(require.resolve('./' + file), 'utf8');
+    const declarations = source.match(/const IMAGE_ASPECTS=[^;]+;\s*function imageGenerationFormat\(aspect,resolution\)\{[\s\S]*?\n  \}/);
+    assert.ok(declarations, `${file} has the native image format helper`);
+    const getFormat = vm.runInNewContext(`(()=>{${declarations[0]};return imageGenerationFormat;})()`);
+    const current = {};
+    for (const aspect of ['1:1', '4:3', '3:2', '16:9', '3:4', '2:3', '9:16']) {
+      const ratio = aspect.split(':').map(Number);
+      for (const resolution of ['1k', '1080p', '4k']) {
+        const value = getFormat(aspect, resolution);
+        assert.equal(value.width % 32, 0); assert.equal(value.height % 32, 0);
+        assert.equal(value.width / value.height, ratio[0] / ratio[1]);
+        assert.equal(value.outputWidth / value.outputHeight, ratio[0] / ratio[1]);
+        const outputEdge = Math.max(value.outputWidth, value.outputHeight);
+        if (resolution === '1k') assert.ok(outputEdge >= 1024 && outputEdge <= 1056);
+        else assert.equal(outputEdge, { '1080p': 1920, '4k': 3840 }[resolution]);
+        assert.equal(value.upscale, { '1k': '', '1080p': '2x', '4k': '4x' }[resolution]);
+        current[`${aspect}/${resolution}`] = value;
+      }
+    }
+    if (expected) assert.deepEqual(JSON.parse(JSON.stringify(current)), JSON.parse(JSON.stringify(expected))); else expected = current;
+    formats[file] = current;
+  }
+});

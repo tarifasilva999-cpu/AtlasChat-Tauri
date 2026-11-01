@@ -1,4 +1,4 @@
-const CACHE = "atlas-chat-native-desktop-v20";
+const CACHE = "atlas-chat-native-desktop-v21";
 const SHELL = [
   "./",
   "./index.html",

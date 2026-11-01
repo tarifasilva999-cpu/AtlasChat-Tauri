@@ -807,6 +807,11 @@ html.desktop-app .desktop-window-mark{display:none}
 .composer-dock .model-picker-trigger-copy strong{font-size:14px!important;font-weight:400!important}
 .composer .effort-picker-trigger{border:0;padding-left:0;font-size:14px}
 .composer-note{font-size:11px}
+.image-format-controls{display:flex;align-items:center;gap:5px;flex:none;margin-left:4px}
+.image-format-controls[hidden]{display:none!important}
+.image-format-controls select{height:30px;max-width:82px;padding:0 20px 0 9px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--text-2);font:500 11px var(--font-ui);cursor:pointer}
+.image-format-controls select:hover{border-color:var(--muted);color:var(--text)}
+@media(max-width:420px){.image-format-controls{gap:3px;margin-left:0}.image-format-controls select{height:28px;max-width:70px;padding-left:7px;padding-right:17px;font-size:10px}}
 .home-icon{filter:none}
 html[data-theme="light"] :is(.home-icon,.about-logo,.mobile-app-icon,.settings-model-icon,.update-heading img){filter:invert(1)}
 .new-chat-home h1 em{font-style:normal;color:#bb96ff}

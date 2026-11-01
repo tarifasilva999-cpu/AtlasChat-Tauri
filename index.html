@@ -125,6 +125,14 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
         </button>
         <button type="button" class="effort-picker-trigger" id="effortPickerTrigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="effortPicker"><span id="effortPickerCurrent">Medium</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+        <div class="image-format-controls" id="imageFormatControls" hidden>
+          <select id="imageAspectRatio" aria-label="Image aspect ratio" title="Image aspect ratio">
+            <option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="3:4">3:4</option><option value="2:3">2:3</option><option value="9:16">9:16</option>
+          </select>
+          <select id="imageResolution" aria-label="Image output resolution" title="1080p targets a 1920-pixel long edge; 4K targets 3840. Larger images take longer and use more GPU memory.">
+            <option value="1k">1K</option><option value="1080p">1080p</option><option value="4k">4K</option>
+          </select>
+        </div>
         <section class="effort-picker" id="effortPicker" role="listbox" aria-label="Effort" hidden>
           <button type="button" class="effort-option" data-effort="low" role="option" aria-selected="false"><span>Low</span><svg class="effort-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
           <button type="button" class="effort-option" data-effort="medium" role="option" aria-selected="true"><span>Medium</span><small>Recommended</small><svg class="effort-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
@@ -377,7 +385,7 @@
 <script src="./atlas-files.js"></script>
 <script>
 (() => {
-  const BUILD = "Atlas-CHAT-B21";
+  const BUILD = "Atlas-CHAT-B22";
   const $ = q => document.querySelector(q);
 
   function initCustomTooltips(){
@@ -799,6 +807,19 @@
     (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)?"forge":bootData.settingsStore.qualityMode==="large"?"apex-ultra":"apex-ultra");
   const initialEffort=normalizeEffort(bootData.settingsStore.effort);
   const initialContextPreferences={...normalizeContextPreferences(bootData.settingsStore.contextPreferences),effort:initialEffort};
+  const IMAGE_ASPECTS={"1:1":[1,1],"4:3":[4,3],"3:2":[3,2],"16:9":[16,9],"3:4":[3,4],"2:3":[2,3],"9:16":[9,16]};
+  function imageGenerationFormat(aspect,resolution){
+    const [ratioWidth,ratioHeight]=IMAGE_ASPECTS[aspect]||IMAGE_ASPECTS["1:1"],baseEdge=1024;
+    const gcd=(a,b)=>b?gcd(b,a%b):a;
+    const widthStep=32/gcd(ratioWidth,32),heightStep=32/gcd(ratioHeight,32);
+    const step=widthStep/gcd(widthStep,heightStep)*heightStep;
+    const scale=Math.round((baseEdge/Math.max(ratioWidth,ratioHeight))/step)*step;
+    const width=ratioWidth*scale,height=ratioHeight*scale;
+    const edge=resolution==="1080p"?1920:resolution==="4k"?3840:baseEdge;
+    const outputWidth=resolution==="1k"?width:Math.round(edge*ratioWidth/Math.max(ratioWidth,ratioHeight));
+    const outputHeight=resolution==="1k"?height:Math.round(edge*ratioHeight/Math.max(ratioWidth,ratioHeight));
+    return {width,height,upscale:resolution==="1080p"?"2x":resolution==="4k"?"4x":"",outputWidth,outputHeight};
+  }
   const MOBILE_RESUME_KEY="atlas.mobile.resume";
   const MOBILE_DRAFT_KEY="atlas.mobile.draft";
   const MOBILE_PENDING_KEY="atlas.mobile.pending";
@@ -822,6 +843,8 @@
     reduceMotion:bootData.settingsStore.reduceMotion===true,
     qualityMode:bootData.settingsStore.qualityMode==="large"?"large":"balanced",
     codingMode:bootData.settingsStore.codingMode===true,
+    imageAspectRatio:Object.prototype.hasOwnProperty.call(IMAGE_ASPECTS,bootData.settingsStore.imageAspectRatio)?bootData.settingsStore.imageAspectRatio:"1:1",
+    imageResolution:["1k","1080p","4k"].includes(bootData.settingsStore.imageResolution)?bootData.settingsStore.imageResolution:"1k",
     poem3Mode:bootData.settingsStore.poem3Mode===true&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare),
     modelChoice:initialModelChoice,
     effort:initialEffort,
@@ -915,6 +938,8 @@
         codingMode:state.codingMode,
         modelChoice:state.modelChoice,
         effort:state.effort,
+        imageAspectRatio:state.imageAspectRatio,
+        imageResolution:state.imageResolution,
         poem3Mode:state.poem3Mode,
         contextPreferences:state.contextPreferences
       }));
@@ -1854,6 +1879,8 @@
           codingMode:state.codingMode,
           modelChoice:state.modelChoice,
           effort:state.effort,
+          imageAspectRatio:state.imageAspectRatio,
+          imageResolution:state.imageResolution,
           poem3Mode:state.poem3Mode,
           contextPreferences:state.contextPreferences
       }
@@ -1911,6 +1938,8 @@
     const importedModelChoice=["apex-light","apex-pro","apex-ultra"].includes(backupModelChoice)?"apex-ultra":
       ["firefly","forge","ultra-code"].includes(backupModelChoice)?backupModelChoice:state.modelChoice;
     const importedEffort=normalizeEffort(data.settings?.effort||state.effort);
+    const importedImageAspectRatio=Object.prototype.hasOwnProperty.call(IMAGE_ASPECTS,data.settings?.imageAspectRatio)?data.settings.imageAspectRatio:state.imageAspectRatio;
+    const importedImageResolution=["1k","1080p","4k"].includes(data.settings?.imageResolution)?data.settings.imageResolution:state.imageResolution;
     const importedPoem3Mode=data.settings?.poem3Mode===true&&Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
     for(const chat of state.chats){if(!chat.modelChoice)chat.modelChoice=chat.id===state.activeChatId&&importedPoem3Mode?"poem3":importedModelChoice;}
     const importedActiveModel=activeChat().modelChoice||importedModelChoice;
@@ -1922,6 +1951,8 @@
     state.codingMode=importedCoding;
     state.modelChoice=importedActiveModel;
     state.effort=importedEffort;
+    state.imageAspectRatio=importedImageAspectRatio;
+    state.imageResolution=importedImageResolution;
     state.poem3Mode=importedActiveModel==="poem3";
     if(!state.poem3Mode)ai.choice=state.modelChoice;
     state.contextPreferences=importedContextPreferences;
@@ -3892,7 +3923,8 @@ Local date/time: ${current}.${global}${local}`
       const stopImageDownload=()=>{void window.atlasDesktop?.imageCancel?.();};
       poem3AbortController.signal.addEventListener("abort",stopImageDownload,{once:true});
       try{await window.AtlasPoem3.withSignal(ensurePoem3Ready(),poem3AbortController.signal);}finally{poem3AbortController.signal.removeEventListener("abort",stopImageDownload);}
-      const result=await window.AtlasPoem3.generate(prompt,{width:512,height:512,signal:poem3AbortController.signal,onProgress:poem3Progress});
+      const format=window.atlasDesktop?.imagePrepare?imageGenerationFormat(state.imageAspectRatio,state.imageResolution):{width:512,height:512,outputWidth:512,outputHeight:512};
+      const result=await window.AtlasPoem3.generate(prompt,{...format,signal:poem3AbortController.signal,onProgress:poem3Progress});
       const preview=await window.AtlasPoem3.withSignal(window.AtlasPoem3.loadPreview(result.id),poem3AbortController.signal);
       if(!preview)throw new Error("The finished image could not be opened.");
       const overlay=ensurePoem3Overlay();
@@ -4829,7 +4861,8 @@ Local date/time: ${current}.${global}${local}`
     const imageMode=state.poem3Mode,imageAvailable=Boolean(navigator.gpu||window.atlasDesktop?.imagePrepare);
     const poem3Button=modelPicker.querySelector('[data-model-choice="poem3"]');
     if(poem3Button){poem3Button.disabled=!imageAvailable;poem3Button.classList.toggle("model-option-disabled",!imageAvailable);}
-    const poem3Note=$("#poem3Note");if(poem3Note)poem3Note.textContent=!imageAvailable?"Image generation is not available here":state.poem3Ready?"Ready on this device":state.poem3Loading?(state.poem3ProgressLabel||"Getting the image model ready…"):"Local · downloads about 10.2 GB once";
+    const poem3Note=$("#poem3Note");if(poem3Note)poem3Note.textContent=!imageAvailable?"Image generation is not available here":state.poem3Ready?"Ready on this device":state.poem3Loading?(state.poem3ProgressLabel||"Getting the image model ready…"):"Local · about 10.2 GB; HD/4K add 67 MB";
+    const imageFormatControls=$("#imageFormatControls");if(imageFormatControls){imageFormatControls.hidden=!imageMode||!window.atlasDesktop?.imagePrepare;$("#imageAspectRatio").value=state.imageAspectRatio;$("#imageResolution").value=state.imageResolution;}
     intelligenceTrigger.hidden=true;
     if(!intelligencePopover.hidden)void closeIntelligencePanel(false,false);
     const name=imageMode?modelChoiceNames.poem3:(modelChoiceNames[state.modelChoice]||modelChoiceNames.forge);
@@ -4910,6 +4943,8 @@ Local date/time: ${current}.${global}${local}`
     else startPreload();
   }
   modelPickerTrigger.onclick=openModelPicker;
+  $("#imageAspectRatio").onchange=()=>{state.imageAspectRatio=Object.prototype.hasOwnProperty.call(IMAGE_ASPECTS,$("#imageAspectRatio").value)?$("#imageAspectRatio").value:"1:1";persistSettings();};
+  $("#imageResolution").onchange=()=>{state.imageResolution=["1k","1080p","4k"].includes($("#imageResolution").value)?$("#imageResolution").value:"1k";persistSettings();};
   $("#settingsChooseModelBtn").onclick=()=>{closePanel(settingsModal);openModelPicker();};
   effortPickerTrigger.onclick=openEffortPicker;
   effortPicker.querySelectorAll("[data-effort]").forEach(option=>option.addEventListener("click",()=>chooseEffort(option.dataset.effort)));

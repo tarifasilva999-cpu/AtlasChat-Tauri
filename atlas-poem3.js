@@ -61,6 +61,7 @@
     else if (/cache|opfs|read/.test(stage)) label = "Opening the saved image model…";
     else if (/weight|load|upload|engine|device/.test(stage)) label = "Loading Image 1.1…";
     else if (/token|text|prompt|embed/.test(stage)) label = "Reading your prompt…";
+    else if (/upscal/.test(stage)) label = "Adding detail to your image…";
     else if (/denois|transform|sample|step|generat/.test(stage)) label = "Creating your image…";
     else if (/decode|vae|finish/.test(stage)) label = "Finishing the image…";
 
@@ -259,6 +260,26 @@
     }, "image/webp", 0.92));
   }
 
+  async function resizePngBlob(blob, width, height) {
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 4096 * 4096) {
+      throw new Error("Image 1.1 returned an unsupported output size.");
+    }
+    const bitmap = await createImageBitmap(blob);
+    if (bitmap.width === width && bitmap.height === height) { bitmap.close?.(); return blob; }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: true });
+    if (!context) { bitmap.close?.(); throw new Error("Atlas could not prepare the final image size."); }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+    return new Promise((resolve, reject) => canvas.toBlob(value => {
+      if (value) resolve(value);
+      else reject(new Error("Atlas could not save the final image size."));
+    }, "image/png"));
+  }
+
   async function generate(prompt, options = {}) {
     const cleanPrompt = String(prompt || "").trim();
     if (!cleanPrompt || cleanPrompt.length > 2000) throw new Error("Image prompts must be between 1 and 2,000 characters.");
@@ -268,7 +289,12 @@
     const abortNative = () => { if (engine.native) void window.atlasDesktop.imageCancel(); };
     options.signal?.addEventListener('abort', abortNative, { once: true });
     try {
-      const result = engine.native ? await window.atlasDesktop.imageGenerate({ prompt: cleanPrompt }) : await engine.generate({
+      const result = engine.native ? await window.atlasDesktop.imageGenerate({
+        prompt: cleanPrompt,
+        width: options.width || 1024,
+        height: options.height || 1024,
+        upscale: options.upscale || ""
+      }) : await engine.generate({
         prompt: cleanPrompt,
         steps: GENERATION_STEPS,
         width: options.width || 512,
@@ -280,12 +306,19 @@
       const blob = engine.native
         ? new Blob([Uint8Array.from(atob(result.png), c => c.charCodeAt(0))], { type: 'image/png' })
         : await pixelsToBlob(result);
+      const finalBlob = engine.native && Number.isInteger(options.outputWidth) && Number.isInteger(options.outputHeight)
+        ? await resizePngBlob(blob, options.outputWidth, options.outputHeight)
+        : blob;
       if (options.signal?.aborted) throw new DOMException("Image creation stopped.", "AbortError");
       const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-      await saveImage(id, blob);
+      await saveImage(id, finalBlob);
       if (options.signal?.aborted) throw new DOMException("Image creation stopped.", "AbortError");
       options.onProgress?.({ stage: "image-saved" });
-      return { id, width: Number(result?.width || result?.image?.width) || 512, height: Number(result?.height || result?.image?.height) || 512 };
+      return {
+        id,
+        width: engine.native ? (options.outputWidth || result?.width || 1024) : Number(result?.width || result?.image?.width) || 512,
+        height: engine.native ? (options.outputHeight || result?.height || 1024) : Number(result?.height || result?.image?.height) || 512
+      };
     } finally {
       options.signal?.removeEventListener('abort', abortNative);
       if (progressHandler === options.onProgress) { progressHandler = null; progressCycle++; }
