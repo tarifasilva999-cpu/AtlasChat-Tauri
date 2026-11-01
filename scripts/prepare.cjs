@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 async function main() {
   const ui = path.join(root, 'frontend-dist'), resources = path.join(root, 'src-tauri/resources');
   await fs.mkdir(ui, { recursive: true });
-  for (const name of ['Atlas-CHAT.html','index.html','atlas-ui.css','atlas-coding.js','atlas-inline-ui.js','atlas-native.js','atlas-poem3.js','atlas-files.js','atlas-mlc-worker.js','manifest.webmanifest','icons','fonts','vendor']) {
+  for (const name of ['Atlas-CHAT.html','index.html','atlas-ui.css','atlas-updates.js','atlas-coding.js','atlas-inline-ui.js','atlas-native.js','atlas-poem3.js','atlas-files.js','atlas-mlc-worker.js','manifest.webmanifest','icons','fonts','vendor']) {
     await fs.cp(path.join(root,name),path.join(ui,name),{recursive:true});
   }
   await esbuild.build({entryPoints:[path.join(root,'tauri/updater.js')],outfile:path.join(ui,'tauri-updater.js'),bundle:true,format:'iife',platform:'browser',target:'es2020',minify:true,legalComments:'none'});

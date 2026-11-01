@@ -70,8 +70,8 @@ fn main() {
             let backend=Backend::start(app.handle().clone(),&resources,&data)?;app.manage(backend);
             let builder=WebviewWindowBuilder::new(app,"main",WebviewUrl::App("Atlas-CHAT.html".into()))
                 .initialization_script(if cfg!(debug_assertions)&&std::env::var_os("ATLAS_VALIDATION_SCRIPT").is_some(){"window.__atlasValidationMode=true;"}else{""})
-                .title("Atlas").inner_size(1240.0,850.0).min_inner_size(650.0,500.0).decorations(false)
-                .background_color(tauri::window::Color(32,32,32,255)).data_directory(data.join("webview"))
+                .title("AtlasChat").inner_size(1240.0,850.0).min_inner_size(650.0,500.0).decorations(false)
+                .background_color(tauri::window::Color(16,16,17,255)).data_directory(data.join("webview"))
                 .drag_and_drop(false)
                 .on_navigation(|url| matches!(url.path(),"/Atlas-CHAT.html"|"/index.html") && (url.scheme()=="tauri" || url.host_str()==Some("tauri.localhost")))
                 .on_new_window(|url,_| {if url.scheme()=="https" {let _=open::that_detached(url.as_str());}tauri::webview::NewWindowResponse::Deny});

@@ -1,1 +1,1 @@
-{"main":{"identifier":"main","description":"Only the packaged Atlas frontend can request allowlisted Atlas operations.","local":true,"windows":["main"],"permissions":["allow-atlas-call","core:event:allow-listen","core:event:allow-unlisten"]}}
+{"main":{"identifier":"main","description":"Only the packaged Atlas frontend can request allowlisted Atlas operations.","local":true,"windows":["main"],"permissions":["allow-atlas-call","core:event:allow-listen","core:event:allow-unlisten","updater:default"]}}

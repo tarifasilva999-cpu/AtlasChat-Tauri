@@ -11,3 +11,7 @@ Before the first release:
 The workflow checks that the tag matches the app version, builds the signed NSIS installer, and publishes it to GitHub Releases. Install the first updater-enabled build manually; later releases can be offered in-app.
 
 Windows updates use the passive NSIS installer. When the user selects Install and restart, AtlasChat exits and the installer reopens it after installation. A new signed release and matching tag are required for existing installations to receive an update; pushing source alone does not publish one.
+
+The in-app prompt can be deferred. Settings > You > Check for updates reopens an available update. Installation waits until the current chat or project task has finished or been stopped. Download failures retain the update so the user can retry.
+
+NSIS uses the header and welcome/finish artwork in `src-tauri/installer`. Run `src-tauri/installer/generate-branding.ps1` to regenerate these bitmaps. The app and installer icons keep their existing artwork.

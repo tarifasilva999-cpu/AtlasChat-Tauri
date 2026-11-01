@@ -58,15 +58,14 @@
     <div class="sidebar-head">
       <div class="sidebar-title">AtlasChat</div>
       <button class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">
-        <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M9 4v16"/></svg>
       </button>
     </div>
 
-    <div class="sidebar-new-wrap">
-      <button class="sidebar-new" id="newChat">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-        <span>New chat</span>
-      </button>
+    <div class="sidebar-conversations-head">
+      <h2 class="sidebar-label">Chats</h2>
+      <button class="sidebar-tool" id="chatSearchToggle" type="button" aria-label="Search chats" aria-expanded="false" aria-controls="chatSearchWrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
+      <button class="sidebar-tool" id="newChat" type="button" aria-label="New chat" title="New chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H5v14h14v-8.5M11 13l1-4L19 2l3 3-7 7-4 1Z"/></svg></button>
     </div>
 
     <div class="sidebar-projects-wrap" id="sidebarProjectsWrap">
@@ -84,14 +83,13 @@
       </section>
     </div>
 
-    <div class="sidebar-search-wrap">
+    <div class="sidebar-search-wrap" id="chatSearchWrap" hidden>
       <div class="sidebar-search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
         <input id="chatSearch" type="search" aria-label="Search chats" placeholder="Search chats" autocomplete="off" />
       </div>
     </div>
 
-    <div class="sidebar-label">Recent chats</div>
     <div class="history" id="chatHistory"></div>
 
     <div class="sidebar-foot">
@@ -249,10 +247,12 @@
   </div>
 </div>
 
-<div class="update-banner" id="updateBanner">
-  <span>An Atlas update is ready.</span>
-  <button id="updateNow">Update</button>
-</div>
+<section class="update-banner" id="updateBanner" role="region" aria-labelledby="updateTitle" aria-live="polite">
+  <div class="update-heading"><img src="./icons/Brand/Chat White.png" alt="" /><h2 id="updateTitle">An update is ready</h2><button id="updateDismiss" type="button" aria-label="Remind me later">×</button></div>
+  <p id="updateMessage">Get the latest improvements to AtlasChat.</p>
+  <progress id="updateProgress" max="100" hidden aria-label="Downloading update"></progress>
+  <div class="update-actions"><button id="updateLater" type="button">Later</button><button id="updateNow" type="button">Update and restart</button></div>
+</section>
 
 <div class="scrim" id="memoryModal" role="dialog" aria-modal="true" aria-label="Memory">
   <section class="panel">
@@ -288,24 +288,23 @@
 
 <div class="scrim" id="settingsModal" role="dialog" aria-modal="true" aria-label="Settings">
   <section class="panel settings-panel">
-    <div class="panel-head settings-panel-head"><div><span class="settings-kicker">ATLAS</span><h2>Settings</h2></div><button class="panel-close" data-close="settingsModal" aria-label="Close settings">×</button></div>
+    <div class="panel-head settings-panel-head"><div><h2>Settings</h2></div><button class="panel-close" data-close="settingsModal" aria-label="Close settings">×</button></div>
     <div class="settings-layout">
       <nav class="settings-nav" role="tablist" aria-label="Settings categories" aria-orientation="vertical">
-        <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPaneAppearance" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg><span>Appearance</span></button>
-        <button class="settings-tab" id="settingsTabModel" type="button" role="tab" aria-controls="settingsPaneModel" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="19" r="2"/></svg><span>Model</span></button>
+        <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPaneAppearance" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.5 2-2 .9-1.8-.6-2 3.4 1.4 1.4v2.3L3.2 14l2 3.4 1.8-.6 2 .9.5 2h4l.5-2 2-.9 1.8.6 2-3.4-1.4-1.6v-2.3l1.4-1.4-2-3.4-1.8.6-2-.9-.5-2z"/><circle cx="11.5" cy="11.5" r="3"/></svg><span>General</span></button>
+        <button class="settings-tab" id="settingsTabModel" type="button" role="tab" aria-controls="settingsPaneModel" aria-selected="false" tabindex="-1"><img class="settings-model-icon" src="./icons/Brand/AtlasCode White.png" alt="" /><span>Model</span></button>
         <button class="settings-tab" id="settingsTabProjects" type="button" role="tab" aria-controls="settingsPaneProjects" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.75 8.25V6.9c0-.91.74-1.65 1.65-1.65h4.45l2.1 2.1h6.65c.91 0 1.65.74 1.65 1.65v8.1c0 .91-.74 1.65-1.65 1.65H5.4c-.91 0-1.65-.74-1.65-1.65V8.25Z"/><path d="M4 9.25h16"/></svg><span>Projects</span></button>
-        <button class="settings-tab" id="settingsTabAtlas" type="button" role="tab" aria-controls="settingsPaneAtlas" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.25"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 5v4m-2-2h4"/></svg><span>Your Atlas</span></button>
+        <button class="settings-tab" id="settingsTabAtlas" type="button" role="tab" aria-controls="settingsPaneAtlas" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.25"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 5v4m-2-2h4"/></svg><span>You</span></button>
       </nav>
       <div class="settings-content">
         <section class="settings-pane" id="settingsPaneAppearance" role="tabpanel" aria-labelledby="settingsTabAppearance">
           <header class="settings-pane-heading"><span class="settings-pane-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></span><div class="settings-pane-copy"><h3>Appearance</h3><p>Set the look and motion of Atlas.</p></div></header>
           <div class="settings-control-list settings-font-list">
-            <div class="settings-control-row"><span class="settings-control-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 4v3m10-3v3M8 7 4 20m4-13 4 13M5.5 17h5M17 7v13m-3-13h6"/></svg></span><div class="settings-control-copy"><span class="settings-control-title" id="chatFontLabel">Chat font</span><span class="settings-control-note">Choose the typeface used for messages.</span></div><select class="settings-font-select" id="settingsChatFont" aria-labelledby="chatFontLabel"><option value="atlas-text" selected>Atlas Text</option><option value="atlas-sans">Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></div>
-            <div class="settings-control-row"><span class="settings-control-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 4v3m10-3v3M8 7 4 20m4-13 4 13M5.5 17h5M17 7v13m-3-13h6"/></svg></span><div class="settings-control-copy"><span class="settings-control-title" id="uiFontLabel">Interface font</span><span class="settings-control-note">Choose the typeface used across Atlas.</span></div><select class="settings-font-select" id="settingsUiFont" aria-labelledby="uiFontLabel"><option value="atlas-text">Atlas Text</option><option value="atlas-sans" selected>Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></div>
-          </div>
-          <div class="settings-control-list">
-            <div class="settings-control-row"><span class="settings-control-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg></span><div class="settings-control-copy"><span class="settings-control-title" id="appearanceLabel">Dark appearance</span><span class="settings-control-note">Use a darker or lighter workspace.</span></div><button class="settings-switch-control" id="themeBtn" type="button" aria-labelledby="appearanceLabel" aria-pressed="true">Switch to light</button></div>
-            <div class="settings-control-row"><span class="settings-control-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10m4 0h2M4 17h2m4 0h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><div class="settings-control-copy"><span class="settings-control-title" id="reduceMotionLabel">Reduce motion</span><span class="settings-control-note">Limit animated effects across Atlas.</span></div><button class="settings-switch-control" id="reduceMotionBtn" type="button" aria-labelledby="reduceMotionLabel" aria-pressed="false">Off</button></div>
+            <div class="settings-control-row"><label class="settings-control-title" for="settingsUiFont">Interface font</label><span class="settings-choice"><select id="settingsUiFont"><option value="atlas-text">Atlas Text</option><option value="atlas-sans" selected>Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></span></div>
+            <div class="settings-control-row"><label class="settings-control-title" for="settingsChatFont">Response font</label><span class="settings-choice"><select id="settingsChatFont"><option value="atlas-text" selected>Atlas Text</option><option value="atlas-sans">Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></span></div>
+            <div class="settings-control-row"><label class="settings-control-title" for="settingsTextSize">Script text size</label><span class="settings-choice"><select id="settingsTextSize"><option value="small">Small</option><option value="medium" selected>Medium (Default)</option><option value="large">Large</option></select></span></div>
+            <div class="settings-control-row"><label class="settings-control-title" for="themeBtn">Visual mode</label><span class="settings-choice"><select id="themeBtn"><option value="dark">Dark</option><option value="light">Light</option></select></span></div>
+            <div class="settings-control-row"><label class="settings-control-title" for="reduceMotionBtn">Motion</label><span class="settings-choice"><select id="reduceMotionBtn"><option value="normal">Normal</option><option value="reduced">Reduced</option></select></span></div>
           </div>
         </section>
         <section class="settings-pane" id="settingsPaneModel" role="tabpanel" aria-labelledby="settingsTabModel" hidden>
@@ -328,6 +327,7 @@
             <button class="side-action settings-action" id="dataBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m8 8 4-4 4 4"/><path d="M5 19.5h14"/></svg></span><span class="settings-action-label">Data</span></button>
             <button class="side-action settings-action" id="infoBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"/><path d="M12 10.75v5M12 8.05h.01"/></svg></span><span class="settings-action-label">About</span></button>
           </div>
+          <div class="settings-update-row"><button id="settingsCheckUpdates" type="button">Check for updates</button><span id="settingsUpdateStatus" role="status"></span></div>
           <dl class="info-grid settings-version"><div class="info-row"><dt>UI version</dt><dd>OriginUI 3</dd></div></dl>
         </section>
       </div>
@@ -368,6 +368,7 @@
 <div class="toast" id="toast" role="status"></div>
 <div class="mini-toast" id="miniToast" role="status"></div>
 
+<script src="./atlas-updates.js"></script>
 <script src="./atlas-coding.js"></script>
 <script src="./atlas-inline-ui.js"></script>
 <script src="./atlas-native.js"></script>
@@ -467,10 +468,6 @@
   const macCompatibilityTitle = $("#macCompatibilityTitle");
   const macCompatibilityCopy = $("#macCompatibilityCopy");
   const macContinue = $("#macContinue");
-  const updateBanner = $("#updateBanner");
-  const updateNow = $("#updateNow");
-  let pendingTauriUpdate = null;
-  const updateMessage = updateBanner.querySelector("span");
   const installModal = $("#installModal");
   const dataModal = $("#dataModal");
   const installBtn = $("#installBtn");
@@ -820,6 +817,7 @@
     theme:bootData.settingsStore.theme,
     chatFont:normalizeFontChoice(bootData.settingsStore.chatFont,"atlas-text"),
     uiFont:normalizeFontChoice(bootData.settingsStore.uiFont,"atlas-sans"),
+    textSize:["small","medium","large"].includes(bootData.settingsStore.textSize)?bootData.settingsStore.textSize:"medium",
     reduceMotion:bootData.settingsStore.reduceMotion===true,
     qualityMode:bootData.settingsStore.qualityMode==="large"?"large":"balanced",
     codingMode:bootData.settingsStore.codingMode===true,
@@ -850,6 +848,9 @@
   function applyFontPreferences(){
     document.documentElement.style.setProperty("--font-chat",FONT_FAMILY_STACKS[state.chatFont]);
     document.documentElement.style.setProperty("--font-ui",FONT_FAMILY_STACKS[state.uiFont]);
+    const scale={small:.9,medium:1,large:1.125}[state.textSize];
+    document.documentElement.style.setProperty("--chat-text-size",`${16*scale}px`);
+    document.documentElement.style.setProperty("--code-text-size",`${13*scale}px`);
   }
   applyFontPreferences();
   document.documentElement.dataset.reduceMotion=String(state.reduceMotion);
@@ -907,6 +908,7 @@
         theme:state.theme,
         chatFont:state.chatFont,
         uiFont:state.uiFont,
+        textSize:state.textSize,
         reduceMotion:state.reduceMotion,
         qualityMode:state.qualityMode,
         codingMode:state.codingMode,
@@ -923,9 +925,7 @@
     state.theme=theme;
     document.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute("content",theme==="dark"?"#202020":"#F7F6F3");
     $("#headerTheme").setAttribute("aria-label",theme==="dark"?"Switch to light appearance":"Switch to dark appearance");
-    $("#appearanceLabel").textContent=theme==="dark"?"Dark appearance":"Light appearance";
-    $("#themeBtn").textContent=theme==="dark"?"Switch to light":"Switch to dark";
-    $("#themeBtn").setAttribute("aria-pressed",String(theme==="dark"));
+    $("#themeBtn").value=theme;
     persistSettings();
     $("#themeIcon").innerHTML=theme==="dark"
       ? '<path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/>'
@@ -1699,19 +1699,11 @@
     showToast.timer=setTimeout(()=>toast.classList.remove("show"),1800);
   }
 
-  function showUpdateAvailable(){
-    updateBanner.classList.add("show");
-  }
-
-  window.addEventListener("atlas:tauri-update-available",event=>{
-    const update=event.detail?.update;
-    if(!window.atlasDesktop||!update)return;
-    pendingTauriUpdate=update;
-    updateMessage.textContent="AtlasChat "+update.version+" is ready. The app will close and reopen to finish installing.";
-    updateNow.textContent="Install and restart";
-    updateNow.disabled=false;
-    showUpdateAvailable();
-  });
+  window.AtlasUpdates.configure({beforeInstall:()=>{
+    if(state.generating||state.queued||(secondaryJob&&secondaryJob.status!=="done")||state.codingGenerating||state.poem3Generating||state.titleGenerating||attachmentBusy)return false;
+    persist();persistSettings();return true;
+  }});
+  function showUpdateAvailable(){window.AtlasUpdates.showWeb(state.swRegistration);}
 
   async function registerServiceWorker(){
     if(window.atlasDesktop||!("serviceWorker" in navigator))return;
@@ -1719,6 +1711,7 @@
     try{
       const reg=await navigator.serviceWorker.register("./sw.js",{scope:"./"});
       state.swRegistration=reg;
+      window.AtlasUpdates.setWebRegistration(reg);
 
       if(reg.waiting && navigator.serviceWorker.controller){
         showUpdateAvailable();
@@ -1744,46 +1737,6 @@
       console.warn("Atlas service worker registration failed:",error);
     }
   }
-
-  updateNow.onclick=async()=>{
-    if(window.atlasDesktop){
-      if(!pendingTauriUpdate){
-        updateNow.disabled=true;
-        updateNow.textContent="Checking…";
-        try{
-          await window.atlasTauriUpdater?.checkForUpdates();
-        }finally{
-          updateNow.disabled=false;
-          updateNow.textContent=pendingTauriUpdate?"Install and restart":"Retry";
-        }
-        return;
-      }
-
-      const update=pendingTauriUpdate;
-      updateNow.disabled=true;
-      updateNow.textContent="Installing…";
-      try{
-        await update.downloadAndInstall(progress=>{
-          if(progress.event==="Started")updateMessage.textContent="Downloading Atlas "+update.version+"…";
-        });
-      }catch(error){
-        console.error("Atlas update installation failed:",error);
-        try{await update.close();}catch{}
-        pendingTauriUpdate=null;
-        updateMessage.textContent="Could not install the update. Check your connection and retry.";
-        updateNow.disabled=false;
-        updateNow.textContent="Retry";
-      }
-      return;
-    }
-
-    const waiting=state.swRegistration?.waiting;
-    if(waiting){
-      waiting.postMessage({type:"SKIP_WAITING"});
-    }else{
-      location.reload();
-    }
-  };
 
   function refreshInstallUI(){
     if(state.standalone){
@@ -4484,12 +4437,19 @@ Local date/time: ${current}.${global}${local}`
     app.classList.toggle("sidebar-open");
   };
   $("#sidebarClose").onclick=()=>{app.classList.remove("sidebar-open");$("#railToggle").focus();};
-  $("#headerTheme").onclick=()=>$("#themeBtn").click();
+  $("#headerTheme").onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
   if(mobileScrim){
     mobileScrim.onclick=()=>{
       if(isMobileUI())app.classList.remove("sidebar-open");
     };
   }
+  $("#chatSearchToggle").onclick=()=>{
+    const wrap=$("#chatSearchWrap"),open=wrap.hidden;
+    wrap.hidden=!open;$("#chatSearchToggle").setAttribute("aria-expanded",String(open));
+    if(open)$("#chatSearch").focus();
+    else{$("#chatSearch").value="";state.searchQuery="";renderHistory();}
+  };
+  $("#chatSearch").addEventListener("keydown",event=>{if(event.key==="Escape"){$("#chatSearchToggle").click();$("#chatSearchToggle").focus();}});
   $("#newChat").onclick=()=>{newChat();closeSidebarIfMobile();};
   $("#mobileNewChat").onclick=()=>newChat();
 
@@ -5001,8 +4961,8 @@ Local date/time: ${current}.${global}${local}`
   $("#infoBtn").onclick=()=>openPanel(infoModal);
   updateModelControls();
 
-  $("#themeBtn").onclick=()=>{
-    setTheme(state.theme==="dark"?"light":"dark");
+  $("#themeBtn").onchange=()=>{
+    setTheme($("#themeBtn").value);
     closeSidebarIfMobile();
   };
   function bindFontSelect(selectId,stateKey,defaultChoice){
@@ -5019,11 +4979,13 @@ Local date/time: ${current}.${global}${local}`
   }
   bindFontSelect("#settingsChatFont","chatFont","atlas-text");
   bindFontSelect("#settingsUiFont","uiFont","atlas-sans");
+  $("#settingsTextSize").value=state.textSize;
+  $("#settingsTextSize").onchange=()=>{state.textSize=$("#settingsTextSize").value;applyFontPreferences();persistSettings();};
   const reduceMotionBtn=$("#reduceMotionBtn");
-  const updateReduceMotionButton=()=>{reduceMotionBtn.textContent=state.reduceMotion?"On":"Off";reduceMotionBtn.setAttribute("aria-pressed",String(state.reduceMotion));};
+  const updateReduceMotionButton=()=>{reduceMotionBtn.value=state.reduceMotion?"reduced":"normal";};
   updateReduceMotionButton();
-  reduceMotionBtn.onclick=()=>{
-    state.reduceMotion=!state.reduceMotion;
+  reduceMotionBtn.onchange=()=>{
+    state.reduceMotion=reduceMotionBtn.value==="reduced";
     document.documentElement.dataset.reduceMotion=String(state.reduceMotion);
     if(state.reduceMotion){$("#intelligenceSliderWrap").classList.remove("context-pulse");$(".composer-dock").classList.remove("context-pulse");}
     updateReduceMotionButton();persistSettings();
