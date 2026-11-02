@@ -8,7 +8,7 @@ Before the first release:
 2. Add the private key as the repository Actions secret `TAURI_SIGNING_PRIVATE_KEY`. If the key has a passphrase, add it as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too. Never put the private key in source control or share it publicly.
 3. Keep the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock` aligned. Push the release commit to `main`; the workflow creates the matching tag and publishes the release. A new checked-in version starts a new version line, with subsequent commits receiving increasing patch versions.
 
-The workflow builds the signed NSIS installer and publishes it to GitHub Releases. Manually pushed tags must match the checked-in app version. Install the first updater-enabled build manually; later releases can be offered in-app.
+The workflow builds the signed NSIS installer and publishes it to GitHub Releases. It also attaches the standalone Windows x64 CLI archive used by the PowerShell installer in `desktop/README.md`. Manually pushed tags must match the checked-in app version. Install the first updater-enabled build manually; later releases can be offered in-app.
 
 Windows updates use the passive NSIS installer. When the user selects Install and restart, AtlasChat exits and the installer reopens it after installation. A new signed release and matching tag are required for existing installations to receive an update; pushing source alone does not publish one.
 

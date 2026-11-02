@@ -2,7 +2,25 @@
 
 ## AtlasChat command line
 
-Start a local, interactive chat from a terminal:
+Install the Windows x64 CLI once from PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/tarifasilva999-cpu/AtlasChat-Tauri/main/scripts/install-cli.ps1 | iex
+```
+
+The installer downloads the latest release's CLI package, adds its user-level `bin` folder to `PATH`, and needs no administrator access. Open a terminal in any folder and run:
+
+```powershell
+atlas
+atlas --model code
+atlas --help
+```
+
+The CLI opens as a compact interactive local chat. It shows the current terminal folder for orientation; it does not read or edit files there. The default model is Atlas 7.5 Mini. The first use asks before downloading model files and the local runner. `--yes` skips that prompt. Replies stream as they are generated. `/model` lists choices, `/model atlas` or `/model code` switches models, `/clear` resets the current conversation, and `/exit` closes Atlas. Conversation history stays in memory for the session.
+
+The CLI uses the Tauri profile's `native-ai` cache and data directory. Set `ATLAS_USER_DATA_DIR` to choose a different data directory explicitly.
+
+For development from this source folder:
 
 ```sh
 npm run chat
@@ -10,17 +28,7 @@ npm run chat -- --model firefly
 npm run chat -- --model apex --yes
 ```
 
-The CLI uses the same pinned llama.cpp runner and Qwen model catalog as Atlas's
-desktop chat. Forge is the default model. Before loading a model, Atlas asks for
-confirmation because first use may download its weights and the local runner.
-`--yes` skips that prompt. Replies stream as they are generated; `/model` lists
-choices, `/model forge` switches models, `/clear` resets the current
-conversation, and `/exit` closes the CLI. The conversation remains in memory
-for that session.
-
-The CLI looks for an existing `Atlas` or `atlas-desktop` data directory and
-reuses its `native-ai` cache. Set `ATLAS_USER_DATA_DIR` to choose the data
-directory explicitly when needed.
+The release workflow attaches a self-contained `atlas-cli-win-x64.zip` with Node.js, the local inference modules, and required runtime dependency. The installer stores versioned files under `%LOCALAPPDATA%\AtlasChatCLI`.
 
 Open **Projects** in the sidebar to create a workspace, import a ZIP, resume a project, or start another chat in it. Atlas 7.5, Atlas 7.5 Mini and Atlas 7.5 Code can use the project workflow. Existing project cards and legacy runs remain readable and migrate in place.
 

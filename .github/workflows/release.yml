@@ -59,6 +59,15 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
 
+      - name: Package the standalone CLI
+        run: node scripts/package-cli.cjs
+
+      - name: Attach the CLI archive
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/atlas-cli-win-x64.zip
+
   commits-to-release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -150,3 +159,12 @@ jobs:
           projectPath: .
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
+
+      - name: Package the standalone CLI
+        run: node scripts/package-cli.cjs
+
+      - name: Attach the CLI archive
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: dist/atlas-cli-win-x64.zip

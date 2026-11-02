@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline/promises');
 const { randomUUID } = require('node:crypto');
+const { version } = require('../package.json');
 const { NativeInference } = require('./native-inference.cjs');
 const { MODELS } = require('./native-catalog.cjs');
 
@@ -24,9 +24,34 @@ const MODEL_ALIASES = {
   firefly: 'forge'
 };
 
+const stdoutTTY = Boolean(process.stdout.isTTY);
+const stderrTTY = Boolean(process.stderr.isTTY);
+const colorAllowed = process.env.NO_COLOR === undefined && process.env.TERM !== 'dumb';
+const color = {
+  reset: '\x1b[0m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  cyan: '\x1b[36m',
+  blue: '\x1b[94m',
+  green: '\x1b[32m',
+  gray: '\x1b[90m'
+};
+
+function paint(style, value, stream = 'stdout') {
+  const text = String(value);
+  const enabled = colorAllowed && (stream === 'stderr' ? stderrTTY : stdoutTTY);
+  return enabled ? `${color[style] || ''}${text}${color.reset}` : text;
+}
+
+function terminalSafe(value) {
+  return String(value ?? '')
+    .replace(/\x1b/g, '\\x1b')
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, character => character === '\t' ? '  ' : '');
+}
+
 function modelChoice(value) {
   const choice = MODEL_ALIASES[String(value || '').trim().toLowerCase()];
-  if (!choice || !MODELS[choice]) throw new Error(`Unknown model “${value}”. Run npm run chat -- --help to see choices.`);
+  if (!choice || !MODELS[choice]) throw new Error(`Unknown model “${value}”. Run atlas --help to see choices.`);
   return choice;
 }
 
@@ -42,7 +67,7 @@ function parseArgs(args) {
       const value = values.shift();
       if (!value) throw new Error(`Missing model after ${arg}.`);
       options.choice = modelChoice(value);
-    } else throw new Error(`Unknown option “${arg}”. Run npm run chat -- --help for usage.`);
+    } else throw new Error(`Unknown option “${arg}”. Run atlas --help for usage.`);
   }
   return options;
 }
@@ -52,16 +77,13 @@ function dataDirectory() {
   if (override?.trim()) return path.resolve(override.trim());
 
   const home = os.homedir();
-  let roots;
-  if (process.platform === 'win32') roots = [process.env.APPDATA || path.join(home, 'AppData', 'Roaming')];
-  else if (process.platform === 'darwin') roots = [path.join(home, 'Library', 'Application Support')];
-  else roots = [process.env.XDG_CONFIG_HOME || path.join(home, '.config')];
-
-  // Electron may use the package name during development or the product name
-  // after packaging. Reuse whichever Atlas data directory already has models.
-  const candidates = roots.flatMap(root => ['Atlas', 'atlas-desktop'].map(name => path.join(root, name)));
-  const cached = candidates.find(candidate => fs.existsSync(path.join(candidate, 'native-ai')));
-  return cached || candidates[candidates.length - 1];
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'ai.atlas.chat.tauri');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'ai.atlas.chat.tauri');
+  }
+  return path.join(process.env.XDG_DATA_HOME || path.join(home, '.local', 'share'), 'ai.atlas.chat.tauri');
 }
 
 function formatSize(bytes) {
@@ -72,35 +94,74 @@ function modelRows() {
   return Object.entries(MODELS).map(([key, model]) => {
     const aliases = key === 'apex-ultra' ? 'atlas' : key === 'ultra-code' ? 'code' : 'mini';
     const size = model.files.reduce((total, file) => total + file.size, 0);
-    return `  ${aliases.padEnd(12)} ${model.label}  (${formatSize(size)})`;
+    return `  ${aliases.padEnd(8)} ${model.label.padEnd(22)} ${formatSize(size)}`;
   }).join('\n');
 }
 
 function printHelp() {
-  process.stdout.write(`AtlasChat CLI\n\n` +
-    `Usage:\n` +
-    `  npm run chat [-- --model <name>] [--yes]\n` +
-    `  node desktop/cli.cjs [--model <name>] [--yes]\n\n` +
+  process.stdout.write(`AtlasChat CLI  v${version}\n\n` +
+    `Usage: atlas [options]\n\n` +
     `Options:\n` +
-    `  -m, --model <name>  Choose the local model (default: mini)\n` +
+    `  -m, --model <name>  Start with a local model (default: mini)\n` +
     `  -y, --yes           Skip the model preparation confirmation\n` +
     `  -h, --help          Show this help\n\n` +
     `Models:\n${modelRows()}\n\n` +
     `Chat commands: /model [name], /clear, /help, /exit\n` +
-    `Set ATLAS_USER_DATA_DIR to use a specific Atlas data directory.\n`);
+    `Set ATLAS_USER_DATA_DIR to choose the local data directory.\n`);
+}
+
+function crop(value, max) {
+  const text = String(value);
+  if (text.length <= max) return text;
+  return max <= 1 ? '…' : `…${text.slice(-(max - 1))}`;
+}
+
+function printWelcome(choice) {
+  const columns = stdoutTTY ? (process.stdout.columns || 96) : 84;
+  const inner = Math.max(28, Math.min(68, columns - 8));
+  const model = MODELS[choice];
+  const size = formatSize(model.files.reduce((total, file) => total + file.size, 0));
+  const cwd = crop(process.cwd(), inner - 4);
+  const line = `╭${'─'.repeat(inner + 2)}╮`;
+  const row = (left, right = '', style = 'gray') => {
+    const leftText = crop(left, inner - right.length - 1);
+    const gap = inner - leftText.length - right.length;
+    process.stdout.write(`│ ${paint(style, leftText)}${' '.repeat(gap)}${right ? paint('gray', right) : ''} │\n`);
+  };
+  process.stdout.write(`${paint('gray', line)}\n`);
+  row('AtlasChat  ·  local CLI', `v${version}`, 'bold');
+  row(model.label, `local  ·  ${size}`, 'cyan');
+  row(`cwd  ${cwd}`);
+  process.stdout.write(`${paint('gray', `╰${'─'.repeat(inner + 2)}╯`)}\n`);
+  process.stdout.write(`\n${paint('dim', 'Local chat · paste context whenever you want Atlas to see it.')}`);
+  process.stdout.write(`\n${paint('dim', 'Type a message or /help for commands.')}\n`);
+}
+
+function writeAssistantText(value, lineState) {
+  const text = terminalSafe(value);
+  let output = '';
+  for (const character of text) {
+    if (lineState.start) {
+      output += '  ';
+      lineState.start = false;
+    }
+    output += character;
+    if (character === '\n') lineState.start = true;
+  }
+  if (output) process.stdout.write(output);
 }
 
 async function main() {
   if (typeof fetch !== 'function') throw new Error('AtlasChat CLI needs Node.js 20 or newer.');
   const options = parseArgs(process.argv.slice(2));
   if (options.help) return printHelp();
-  if (!process.stdin.isTTY) throw new Error('Run AtlasChat in an interactive terminal. Use --yes to skip the model confirmation.');
+  if (!process.stdin.isTTY) throw new Error('Run Atlas in an interactive terminal.');
 
   let choice = options.choice;
   let activeId = null;
   let activeKind = null;
   let closed = false;
-  let lastStatus = '';
+  let lastProgress = '';
   let progressOnLine = false;
   const history = [];
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
@@ -108,21 +169,28 @@ async function main() {
     directory: path.join(dataDirectory(), 'native-ai'),
     emit(event) {
       if (event.type === 'phase') {
-        let message = event.detail || 'Preparing the local model…';
-        if (event.total > 0 && event.loaded >= 0 && event.loaded < event.total) {
-          message += ` ${Math.floor(event.loaded / event.total * 100)}%`;
-        }
-        if (message !== lastStatus || event.total > 0) {
-          lastStatus = message;
-          progressOnLine = Boolean(process.stderr.isTTY);
-          process.stderr.write(process.stderr.isTTY ? `\r\x1b[2K${message}` : `${message}\n`);
+        const message = terminalSafe(event.detail || 'Preparing the local model…');
+        const percent = event.total > 0 && event.loaded >= 0
+          ? Math.max(0, Math.min(100, Math.floor(event.loaded / event.total * 100)))
+          : null;
+        const stage = event.phase || message;
+        const step = percent === null ? '' : Math.floor(percent / 10) * 10;
+        const key = `${stage}:${step}`;
+        if (key === lastProgress) return;
+        lastProgress = key;
+        if (stderrTTY) {
+          const bar = percent === null ? '' : ` ${paint('gray', `[${'━'.repeat(Math.floor(percent / 10))}${'─'.repeat(10 - Math.floor(percent / 10))}] ${percent}%`, 'stderr')}`;
+          process.stderr.write(`\r\x1b[2K  ${paint('cyan', '◌', 'stderr')} ${message}${bar}`);
+          progressOnLine = true;
+        } else {
+          process.stderr.write(`  ${message}${percent === null ? '' : ` ${percent}%`}\n`);
         }
       } else if (event.type === 'chunk' && event.id === activeId) {
         const delta = String(event.chunk?.choices?.[0]?.delta?.content || '');
-        if (delta) process.stdout.write(delta);
+        writeAssistantText(delta, assistantLine);
       } else if (event.type === 'reply-phase' && event.id === activeId && activeKind === 'reply') {
-        process.stderr.write(`${progressOnLine ? '\n' : ''}${event.detail || 'Generating…'}\n`);
-        progressOnLine = false;
+        if (progressOnLine) { process.stderr.write('\r\x1b[2K'); progressOnLine = false; }
+        process.stderr.write(`  ${paint('dim', terminalSafe(event.detail || 'Thinking…'), 'stderr')}\n`);
       }
     }
   });
@@ -132,7 +200,7 @@ async function main() {
     const size = formatSize(model.files.reduce((total, file) => total + file.size, 0));
     let answer;
     try {
-      answer = await rl.question(`Prepare ${model.label}? First use may download up to ${size} of model files plus the local runner. [Y/n] `);
+      answer = await rl.question(`\nPrepare ${model.label}? First use may download ${size} of model files plus the local runner. [Y/n] `);
     } catch (error) {
       if (closed) return false;
       throw error;
@@ -146,6 +214,7 @@ async function main() {
     if (!await confirmPreparation(model)) return false;
     if (inference.ready || inference.server || inference.loading) await inference.unload();
     choice = nextChoice;
+    lastProgress = '';
     const id = `cli-load:${randomUUID()}`;
     activeId = id;
     activeKind = 'load';
@@ -153,14 +222,14 @@ async function main() {
       await inference.load({ id, choice, contextWindow: 8192 });
       activeId = null;
       activeKind = null;
-      if (progressOnLine) { process.stderr.write('\n'); progressOnLine = false; }
-      process.stderr.write(`${model.label} is ready on this computer.\n`);
+      if (progressOnLine) { process.stderr.write('\r\x1b[2K'); progressOnLine = false; }
+      process.stderr.write(`  ${paint('green', '✓', 'stderr')} ${model.label} is ready on this computer.\n`);
       return true;
     } catch (error) {
       activeId = null;
       activeKind = null;
+      if (progressOnLine) { process.stderr.write('\r\x1b[2K'); progressOnLine = false; }
       if (error?.code === 'STOPPED') {
-        if (progressOnLine) { process.stderr.write('\n'); progressOnLine = false; }
         process.stderr.write('Model preparation stopped.\n');
         return false;
       }
@@ -168,6 +237,7 @@ async function main() {
     }
   };
 
+  let assistantLine = { start: true };
   rl.on('SIGINT', () => {
     if (activeId) {
       process.stderr.write(`\nStopping ${activeKind === 'load' ? 'model preparation' : 'the reply'}…\n`);
@@ -179,37 +249,37 @@ async function main() {
   });
 
   try {
-    process.stdout.write(`AtlasChat CLI · ${MODELS[choice].label}\nType a message, or /help for commands.\n`);
+    printWelcome(choice);
     if (!await loadModel(choice)) return;
 
     while (!closed) {
       let input;
-      try { input = await rl.question('\nYou › '); }
+      try { input = await rl.question(`\n${paint('cyan', '›')} `); }
       catch { break; }
       const line = input.trim();
       if (!line) continue;
 
       if (line === '/exit' || line === '/quit') break;
       if (line === '/help') {
-        process.stdout.write('/model [name]  switch local models\n/clear         clear this conversation\n/exit          close AtlasChat\n');
+        process.stdout.write('\n  /model [name]  switch local models\n  /clear         clear this conversation\n  /exit          close Atlas\n');
         continue;
       }
       if (line === '/clear') {
         history.length = 0;
-        process.stdout.write('Conversation cleared.\n');
+        process.stdout.write(`\n${paint('dim', 'Conversation cleared.')}`);
         continue;
       }
       if (line === '/model' || line.startsWith('/model ')) {
         const requested = line.slice('/model'.length).trim();
         if (!requested) {
-          process.stdout.write(`Current model: ${MODELS[choice].label}\nAvailable models:\n${modelRows()}\n`);
+          process.stdout.write(`\nCurrent model: ${MODELS[choice].label}\nAvailable models:\n${modelRows()}\n`);
           continue;
         }
         try {
           const nextChoice = modelChoice(requested);
-          if (nextChoice === choice) process.stdout.write(`${MODELS[choice].label} is already selected.\n`);
+          if (nextChoice === choice) process.stdout.write(`\n${MODELS[choice].label} is already selected.\n`);
           else if (await loadModel(nextChoice)) process.stdout.write(`Switched to ${MODELS[choice].label}.\n`);
-        } catch (error) { process.stderr.write(`${error.message}\n`); }
+        } catch (error) { process.stderr.write(`${terminalSafe(error.message)}\n`); }
         continue;
       }
 
@@ -218,20 +288,21 @@ async function main() {
       const id = `cli-chat:${randomUUID()}`;
       activeId = id;
       activeKind = 'reply';
-      process.stdout.write('\nAtlas › ');
+      assistantLine = { start: true };
+      process.stdout.write(`\n${paint('blue', 'Atlas')}\n`);
       try {
         const result = await inference.complete({ id, lease: inference.ready?.lease, kind: 'chat',
           max_tokens: 1024, temperature: 0.7, messages: history });
         if (result.stopped) {
           history.pop();
-          process.stdout.write('\n[stopped]\n');
+          process.stdout.write(`\n${paint('dim', '[stopped]')}\n`);
         } else {
           history.push({ role: 'assistant', content: result.text });
           process.stdout.write('\n');
         }
       } catch (error) {
         history.pop();
-        process.stderr.write(`\n${error.message || error}\n`);
+        process.stderr.write(`\n${terminalSafe(error.message || error)}\n`);
       } finally {
         activeId = null;
         activeKind = null;
@@ -241,11 +312,12 @@ async function main() {
     closed = true;
     rl.close();
     await inference.unload().catch(() => {});
-    process.stderr.write('AtlasChat closed.\n');
+    if (progressOnLine) process.stderr.write('\r\x1b[2K');
+    process.stderr.write(`${paint('dim', 'AtlasChat closed.', 'stderr')}\n`);
   }
 }
 
 main().catch(error => {
-  process.stderr.write(`AtlasChat: ${error.message || error}\n`);
+  process.stderr.write(`${paint('blue', 'Atlas', 'stderr')}: ${terminalSafe(error.message || error)}\n`);
   process.exitCode = 1;
 });

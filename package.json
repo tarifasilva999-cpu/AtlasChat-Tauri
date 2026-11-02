@@ -1,6 +1,6 @@
 {
   "name": "atlaschat-tauri",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "AtlasChat Tauri 2 desktop",
   "scripts": {
@@ -10,6 +10,7 @@
     "build:exe": "tauri build --no-bundle",
     "test": "node --test atlas-updates.test.cjs atlas-poem3.test.cjs desktop/*.test.cjs migration/*.test.cjs tauri/*.test.cjs scripts/*.test.cjs",
     "check:core": "node --test desktop/core.test.cjs desktop/projects.test.cjs desktop/runner.test.cjs desktop/workflow.test.cjs",
+    "package:cli": "node scripts/package-cli.cjs",
     "migrate:data": "node migration/export.cjs",
     "chat": "node desktop/cli.cjs"
   },
