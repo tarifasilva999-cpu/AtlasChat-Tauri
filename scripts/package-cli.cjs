@@ -24,6 +24,7 @@ async function main() {
   for (const name of ['cli.cjs', 'native-inference.cjs', 'native-download.cjs', 'native-catalog.cjs']) {
     await fs.copyFile(path.join(root, 'desktop', name), path.join(stage, 'desktop', name));
   }
+  await fs.cp(path.join(root, 'model-instructions'), path.join(stage, 'model-instructions'), { recursive: true });
   await fs.cp(fflate, path.join(stage, 'node_modules', 'fflate'), { recursive: true });
   await fs.copyFile(node, path.join(stage, 'node', 'node.exe'));
   const nodeLicense = path.join(path.dirname(process.execPath), 'LICENSE');

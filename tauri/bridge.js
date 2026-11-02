@@ -4,7 +4,7 @@
   const call = (name,value) => window.__TAURI__.core.invoke('atlas_call',{name,value:value??null});
   const listeners = new Set();
   const connected = window.__TAURI__.event.listen('atlas-inference',event=>{for(const listener of listeners)listener(event.payload)});
-  const names = ['info','create','inferenceInfo','inferenceLoad','inferenceComplete','inferenceCancel','inferenceUnload','imagePrepare','imageGenerate','imageCancel','read','source','save','event','model','check','cancel','finish','exportProject','preview','exportBackup','importBackup','research','chooseCoder','windowAction','projects','deleteProject','projectCommand','importProject'];
+  const names = ['info','create','createScratch','inferenceInfo','inferenceLoad','inferenceComplete','inferenceCancel','inferenceUnload','imagePrepare','imageGenerate','imageCancel','read','source','save','event','model','check','cancel','finish','exportProject','preview','exportBackup','importBackup','research','chooseCoder','windowAction','projects','deleteProject','projectCommand','importProject'];
   const bridge = Object.fromEntries(names.map(name=>[name,async value=>{if(name==='inferenceLoad'&&window.__atlasValidationMode&&!window.__atlasValidation?.ownsInference)return new Promise(()=>{});await connected;return call(name,value)}]));
   bridge.onInference = listener => { if(typeof listener!=='function')throw new TypeError('Expected an inference listener');listeners.add(listener);return()=>listeners.delete(listener); };
   Object.defineProperty(window,'atlasDesktop',{value:Object.freeze(bridge),writable:false,configurable:false});

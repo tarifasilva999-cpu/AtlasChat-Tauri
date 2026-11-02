@@ -143,6 +143,7 @@
       for (const el of document.querySelectorAll('[data-coding-pending]')) el.textContent = active.message.content;
       return;
     }
+    if(active.temporary){active.message.content=name+' — '+text;hooks.persist();hooks.render();}
     refresh(await bridge.event({ id: active.id, taskId: active.task?.id, stage: name, text, sources }));
   }
   // Calls use a bounded brief, one small file at a time, and short action summaries.
@@ -151,7 +152,9 @@
     const engine = hooks.ai.engine;
     if (!engine) throw new Error('Load a model before starting a project.');
     const contextWindow = Number(hooks.ai.projectContextWindow || 4096);
-    const budget = Math.min(maxTokens, contextWindow - Math.ceil(new TextEncoder().encode(prompt).length / 2) - 450);
+    const modelInstructions = window.AtlasModelInstructions?.forChoice(hooks.ai.choice || hooks.state.modelChoice) || '';
+    const instructionBudget = Math.ceil(new TextEncoder().encode(modelInstructions).length / 2.7) + (modelInstructions ? 12 : 0);
+    const budget = Math.min(maxTokens, contextWindow - Math.ceil(new TextEncoder().encode(prompt).length / 2) - instructionBudget - 450);
     if (budget < Math.min(maxTokens,400)) throw new Error('This step is too large for the local context. Split the project into smaller parts.');
     let output = '', finish;
     if (active.task) await command('RECORD_CALL', { inputChars: prompt.length });
@@ -521,7 +524,7 @@
     message.codingRequest = request;
     message.codingDownloadCancelled = false;
     delete message.projectTaskError;
-    active = { message, chat, id: null, task: null, revision:0, hashes:new Map(), completeReads:new Set(), mutations:0, stopped: false, controller: new AbortController(),
+    active = { message, chat, id: null, task: null, temporary:false, revision:0, hashes:new Map(), completeReads:new Set(), mutations:0, stopped: false, controller: new AbortController(),
       baseModelId: message.codingBaseModelId || null,
       baseModelVariant: message.codingBaseModelVariant || null,
       baseModelTier: message.codingBaseModelTier || null };
@@ -531,12 +534,21 @@
     try {
       const previousProject = active.chat.messages.slice(0, -1).reverse().find(m => m.projectRunId);
       const projectId = active.chat.projectId || previousProject?.projectRunId;
-      const runData = projectId ? await bridge.read(projectId) : await bridge.create({title:request.slice(0,80),runtime:/\bpython\b/i.test(request)?'python':'web',entrypoint:/\bpython\b/i.test(request)?'main.py':'index.html'});
-      active.id = runData.id; active.revision = runData.revision; active.chat.projectId = runData.id; message.projectRunId = runData.id;
+      const previousScratch = active.chat.messages.slice(0, -1).reverse().find(m => m.scratchRunId);
+      const scratchId = active.chat.scratchWorkspaceId || previousScratch?.scratchRunId;
+      let runData = projectId ? await bridge.read(projectId) : null;
+      if(!projectId&&scratchId){
+        try{const saved=await bridge.read(scratchId);if(!saved.expiresAt||Number(saved.expiresAt)>Date.now())runData=saved;}
+        catch(error){if(!/ENOENT|not found|unavailable/i.test(String(error.message||error)))throw error;}
+      }
+      if(!projectId&&!runData)runData=await bridge.createScratch({title:request.slice(0,80),runtime:/\bpython\b/i.test(request)?'python':'web',entrypoint:/\bpython\b/i.test(request)?'main.py':'index.html'});
+      active.temporary=!projectId;active.id = runData.id; active.revision = runData.revision;
+      if(active.temporary){active.chat.scratchWorkspaceId=runData.id;message.scratchRunId=runData.id;delete message.projectRunId;}
+      else{active.chat.projectId=runData.id;message.projectRunId=runData.id;}
       active.taskHistory=projectTaskContext(runData,request,650);
       active.fileIndex=runData.files||[];
       hooks.persist(); hooks.renderHistory?.();
-      await command('ATTACH_CHAT');
+      if(!active.temporary)await command('ATTACH_CHAT');
       active.task = await command('START_TASK',{request});
       message.projectTaskId=active.task.id;
       await command('CHECKPOINT',{label:'Before '+request.slice(0,70)});
@@ -607,7 +619,7 @@
         const done = await (active.task?bridge.finish({ id: active.id, status: active.stopped ? 'interrupted' : 'finished' }):bridge.read(active.id)).catch(() => null);
         if (done) {
           cache.set(done.id, done);
-          message.content = done.title + ' — ' + statusText(done) + '\n' + done.files.map(f => f.path).join('\n');
+          message.content = (done.temporary?'Temporary workspace — ':'') + done.title + ' — ' + statusText(done) + '\n' + done.files.map(f => f.path).join('\n');
         }
       }
       const backgroundChat=active.chat.id!==state.activeChatId;

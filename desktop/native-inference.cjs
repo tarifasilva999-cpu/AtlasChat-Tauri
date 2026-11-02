@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { setTimeout: pause } = require('node:timers/promises');
 const { RELEASE, runtimeFor, modelFor, contextFor } = require('./native-catalog.cjs');
+const { loadModelInstructions, withModelInstructions } = require('./model-instructions.cjs');
 const { downloadVerified, unpackRuntime } = require('./native-download.cjs');
 
 function failure(message, code = 'NATIVE_ERROR') { return Object.assign(new Error(message), { code }); }
@@ -135,6 +136,7 @@ class NativeInference {
     const deadline = setTimeout(() => controller.abort(failure('The model setup reached its time limit. Send again to resume the saved download.', 'TIMEOUT')), 45 * 60 * 1000);
     operation.promise = (async () => {
       try {
+        const instructions = await loadModelInstructions(choice);
         this.notify('starting', `Preparing ${model.label} on this computer…`);
         if (os.totalmem() < model.minimumGB * 1024 ** 3) throw failure(`${model.label} needs at least ${model.minimumGB} GB of system memory. Choose a smaller Atlas model on this computer.`);
         await fs.mkdir(this.directory, { recursive: true });
@@ -147,6 +149,8 @@ class NativeInference {
           try {
             const runtime = await this.runtime(cpu, controller.signal);
             const meta = await this.startServer(runtime, modelPath, context, cpu, controller.signal);
+            this.server.choice = choice;
+            this.server.instructions = instructions;
             this.notify('verifying', `Checking that ${model.label} can reply…`);
             const reply = await this.complete({ id: `verify:${id}`, lease: meta.lease, kind: 'verify', max_tokens: 8,
               messages: [{ role: 'user', content: 'Reply with the word Ready.' }] }, controller.signal);
@@ -226,10 +230,17 @@ class NativeInference {
     throw failure('The model could not finish loading into memory within three minutes.', 'TIMEOUT');
   }
   async complete(value = {}, parentSignal) {
-    const id = requestId(value.id), messages = messagesFor(value.messages);
+    const id = requestId(value.id), inputMessages = messagesFor(value.messages);
     const server = this.server;
     if (!server || (value.lease && value.lease !== server.lease)) throw failure('The local model needs to be loaded again.');
     if (this.jobs.size) throw failure('The local model is already working on another request.');
+    const kind = String(value.kind || 'chat');
+    let messages = inputMessages;
+    if (['chat', 'plan', 'code'].includes(kind)) {
+      const choice = server.choice || this.ready?.choice || String(this.ready?.key || '').split(':')[0];
+      const instructions = server.instructions || await loadModelInstructions(choice);
+      messages = messagesFor(withModelInstructions(inputMessages, choice, instructions));
+    }
     const controller = new AbortController(), job = { id, controller };
     this.jobs.set(id, job);
     const signal = parentSignal ? AbortSignal.any([controller.signal, parentSignal]) : controller.signal;

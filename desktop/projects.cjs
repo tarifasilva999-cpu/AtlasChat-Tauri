@@ -5,6 +5,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { Store, projectPath, runId, fingerprint } = require('./core.cjs');
 const { bytes, text, indexFile, audit } = require('./project-audit.cjs');
+const SCRATCH_ID_PREFIX = 'a75c7a11-';
+const SCRATCH_TTL_MS = 48 * 60 * 60 * 1000;
 const LIMITS = { files: 512, fileBytes: 8 * 1024 * 1024, totalBytes: 32 * 1024 * 1024, context: 6000, output: 3000 };
 const POLICIES = {
   small: { calls: 4, repairs: 1, research: 0, context: 4500 },
@@ -61,7 +63,8 @@ function commandPlan(source, run) {
   return result;
 }
 class ProjectManager extends Store {
-  constructor(root) { super(root); this.locks = new Map(); this.indexes = new Map(); this.executing = new Set(); }
+  constructor(root) { super(root); this.scratchRoot=path.join(path.dirname(root),'coding-scratch');this.locks = new Map(); this.indexes = new Map(); this.executing = new Set(); }
+  dir(id) { const safe=runId(id);return path.join(safe.startsWith(SCRATCH_ID_PREFIX)?this.scratchRoot:this.root,safe); }
   workspace(id) { return path.join(this.dir(id), 'workspace'); }
   async readWorkspace(id, run) {
     const root = this.workspace(id), known = new Map((run.files || []).map(file => [file.path, file]));
@@ -208,6 +211,17 @@ class ProjectManager extends Store {
       revision: 0, files: [], directories: [], events: [], lastCheck: null, memory: {}, history: [], chats: [], checkpoints: [], tasks: [], architecture: '', commands: {}, sourceHash:fingerprint([]), archiveHash:null, checkpointFormat:2 };
     await fs.mkdir(this.dir(run.id), { recursive: true }); await this.commit(run.id, { run, source: [] }); return run;
   }
+  async createScratch(value) {
+    const runtime = ['web', 'python', 'godot', 'unsupported'].includes(value.runtime) ? value.runtime : 'unsupported';
+    const run = { version: 3, id: SCRATCH_ID_PREFIX + crypto.randomUUID().slice(SCRATCH_ID_PREFIX.length), title: String(value.title || 'Temporary workspace').slice(0,100), runtime,
+      entrypoint: projectPath(value.entrypoint || 'index.html'), status: 'incomplete', actualModel: '', created: Date.now(), temporary: true,
+      expiresAt: Date.now() + SCRATCH_TTL_MS, revision: 0, files: [], directories: [], events: [], lastCheck: null, memory: {}, history: [], chats: [], checkpoints: [], tasks: [], architecture: '', commands: {}, sourceHash:fingerprint([]), archiveHash:null, checkpointFormat:2 };
+    await this.cleanupExpiredScratch();
+    const existing=await fs.readdir(this.scratchRoot,{withFileTypes:true});
+    if(existing.filter(entry=>entry.isDirectory()&&entry.name.startsWith(SCRATCH_ID_PREFIX)).length>=8)throw new Error('Temporary coding workspaces are full. Older workspaces expire after 48 hours; try again later.');
+    await fs.mkdir(this.dir(run.id));
+    await this.commit(run.id, { run, source: [] }); return run;
+  }
   async read(id) { return (await this.state(id)).run; }
   async source(id) { return (await this.state(id)).source; }
   async put(run) {
@@ -220,6 +234,7 @@ class ProjectManager extends Store {
   async event(id, event) {
     return this.locked(id, async () => {
       const state = await this._state(id);
+      if(state.run.temporary)state.run.expiresAt=Date.now()+SCRATCH_TTL_MS;
       const task=state.run.tasks.find(t=>t.id===event.taskId) || (!event.taskId && state.run.tasks.find(t=>t.status==='working'));
       const item={ at: Date.now(), stage: String(event.stage || '').slice(0,40), text: String(event.text || '').slice(0,16000),
         ...(task?{taskId:task.id,chatId:task.chatId}:{}),
@@ -268,6 +283,7 @@ class ProjectManager extends Store {
     }
     return this.locked(id, async () => {
       const state = await this._state(id), { run, source } = state, index = this.index(id, source);
+      if(run.temporary)run.expiresAt=Date.now()+SCRATCH_TTL_MS;
       const task = run.tasks.find(t => t.id === taskId);
       const limit = Math.max(100, Math.min(Number(args.limit) || LIMITS.output, 12000));
       let result;
@@ -434,7 +450,7 @@ class ProjectManager extends Store {
     return this.locked(id, async () => {
       const run = (await this._state(id)).run;
       if (run.status === 'working' || run.tasks.some(task => task.status === 'working')) throw new Error('Finish or stop the active project task before deleting.');
-      const root = path.resolve(this.root), target = path.resolve(this.dir(id));
+      const root = path.resolve(id.startsWith(SCRATCH_ID_PREFIX)?this.scratchRoot:this.root), target = path.resolve(this.dir(id));
       if (path.dirname(target) !== root) throw new Error('Invalid project directory.');
       await fs.rm(target, { recursive: true });
       this.indexes.delete(id);
@@ -442,11 +458,48 @@ class ProjectManager extends Store {
     });
   }
   async list() { const result=[];for(const id of await this.ids()){const r=await this.read(id);result.push({id,title:r.title,status:r.status,revision:r.revision,chats:r.chats,updated:r.updated||r.created});}return result.sort((a,b)=>b.updated-a.updated); }
-  async recover() { await super.recover();for(const id of await this.ids())await this.locked(id,async()=>{const s=await this._state(id);for(const t of s.run.tasks)if(t.status==='working')t.status='interrupted';await this.commit(id,s);}); }
+  async cleanupExpiredScratch(now=Date.now()) {
+    await fs.mkdir(this.scratchRoot,{recursive:true});
+    for(const entry of await fs.readdir(this.scratchRoot,{withFileTypes:true})){
+      if(!entry.isDirectory()||!entry.name.startsWith(SCRATCH_ID_PREFIX))continue;
+      const id=entry.name;
+      try{
+        runId(id);const run=await this.read(id);
+        if(!run.temporary||Number(run.expiresAt)>now)continue;
+        await this.locked(id,async()=>{
+          const state=await this._state(id);
+          if(!state.run.temporary||Number(state.run.expiresAt)>now)return;
+          await fs.rm(this.dir(id),{recursive:true});this.indexes.delete(id);
+        });
+      }catch(error){if(error.code!=='ENOENT')throw error;}
+    }
+  }
+  async recoverScratch() {
+    await fs.mkdir(this.scratchRoot,{recursive:true});
+    for(const entry of await fs.readdir(this.scratchRoot,{withFileTypes:true})){
+      if(!entry.isDirectory()||!entry.name.startsWith(SCRATCH_ID_PREFIX))continue;
+      const id=entry.name;
+      try{
+        runId(id);const run=await this.read(id);if(!run.temporary)continue;
+        if(run.tasks.some(task=>task.status==='working')||run.status==='working')await this.locked(id,async()=>{
+          const state=await this._state(id);
+          for(const task of state.run.tasks)if(task.status==='working')task.status='interrupted';
+          if(state.run.status==='working')state.run.status='incomplete';
+          await this.commit(id,state);
+        });
+      }catch(error){if(error.code!=='ENOENT')throw error;}
+    }
+  }
+  async recover() {
+    await super.recover();
+    for(const id of await this.ids())await this.locked(id,async()=>{const s=await this._state(id);for(const t of s.run.tasks)if(t.status==='working')t.status='interrupted';await this.commit(id,s);});
+    await this.recoverScratch();
+    await this.cleanupExpiredScratch();
+  }
   async importZip(data, title) {
     const {source,directories}=sourceFromZip(data);
     if(!source.length)throw new Error('ZIP contains no files.');const run=await this.create({title,...detect(source)});await this.save(run.id,source,0);const imported=await this.read(run.id);imported.directories=directories;await this.put(imported);return this.read(run.id);
   }
   async zip(id) { return this.locked(id,async()=>{await this._state(id);return fs.readFile(path.join(this.dir(id),'project.zip'));}); }
 }
-module.exports={ProjectManager,validateFiles,validateCommands,detect,complexity,sourceFromZip,POLICIES,LIMITS};
+module.exports={ProjectManager,validateFiles,validateCommands,detect,complexity,sourceFromZip,POLICIES,LIMITS,SCRATCH_ID_PREFIX,SCRATCH_TTL_MS};

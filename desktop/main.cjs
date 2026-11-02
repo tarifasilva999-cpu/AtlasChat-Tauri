@@ -141,6 +141,7 @@ app.whenReady().then(async () => {
     return true;
   });
   handle('create', value => store.create(value));
+  handle('createScratch', value => store.createScratch(value));
   handle('read', id => store.read(runId(id)));
   handle('source', id => store.source(runId(id)));
   handle('projects', () => store.list());

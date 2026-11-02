@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const call = (name, value) => ipcRenderer.invoke('atlas:' + name, value);
 // No generic IPC, filesystem, process, or shell capability is exposed.
 contextBridge.exposeInMainWorld('atlasDesktop', {
-  info: () => call('info'), create: value => call('create', value),
+  info: () => call('info'), create: value => call('create', value), createScratch: value => call('createScratch', value),
   inferenceInfo: () => call('inferenceInfo'),
   inferenceLoad: value => call('inferenceLoad', value),
   inferenceComplete: value => call('inferenceComplete', value),

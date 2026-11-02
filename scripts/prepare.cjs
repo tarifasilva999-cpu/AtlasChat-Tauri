@@ -2,10 +2,18 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { loadModelInstructions } = require('../desktop/model-instructions.cjs');
 const root = path.resolve(__dirname, '..');
 async function main() {
   const ui = path.join(root, 'frontend-dist'), resources = path.join(root, 'src-tauri/resources');
   await fs.mkdir(ui, { recursive: true });
+  const profiles = {};
+  for (const choice of ['apex-ultra', 'ultra-code', 'forge']) {
+    const profile = await loadModelInstructions(choice);
+    profiles[choice] = { id: profile.id, prompt: profile.prompt };
+  }
+  const instructionBundle = `(() => {\n  const profiles = ${JSON.stringify(profiles)};\n  const get = choice => profiles[choice === 'ultra-code' ? 'ultra-code' : ['forge', 'firefly'].includes(choice) ? 'forge' : 'apex-ultra'];\n  window.AtlasModelInstructions = Object.freeze({ forChoice: choice => get(choice)?.prompt || '' });\n})();\n`;
+  await fs.writeFile(path.join(ui, 'atlas-model-instructions.js'), instructionBundle);
   for (const name of ['Atlas-CHAT.html','index.html','atlas-ui.css','atlas-updates.js','atlas-coding.js','atlas-inline-ui.js','atlas-native.js','atlas-poem3.js','atlas-files.js','atlas-mlc-worker.js','manifest.webmanifest','icons','fonts','vendor']) {
     await fs.cp(path.join(root,name),path.join(ui,name),{recursive:true});
   }
@@ -15,7 +23,8 @@ async function main() {
   await fs.writeFile(coding,(await fs.readFile(coding,'utf8')).replace('(() => {','(async () => {\n  await window.atlasMigrationReady;'));
   for (const name of ['Atlas-CHAT.html','index.html']) {
     const file=path.join(ui,name); let html=await fs.readFile(file,'utf8');
-    html=html.replace('<script src="./atlas-coding.js"></script>', '<script src="./tauri-bridge.js"></script>\n<script src="./tauri-updater.js"></script>\n<script src="./atlas-coding.js"></script>');
+    html=html.replace('<script src="./atlas-coding.js"></script>', '<script src="./tauri-bridge.js"></script>\n<script src="./tauri-updater.js"></script>\n<script src="./atlas-model-instructions.js"></script>\n<script src="./atlas-coding.js"></script>');
+    if(!html.includes('atlas-model-instructions.js'))throw Error('Model instruction profiles were not injected into the frontend.');
     html=html.replace(/<script>\s*\(\(\)\s*=>\s*\{/,'<script>\n(async () => {\n  await window.atlasMigrationReady;');
     // Current entry uses an IIFE, assert the migration gate was inserted.
     if(!html.includes('await window.atlasMigrationReady'))throw Error('Frontend startup shape changed; migration must run before localStorage reads.');
@@ -38,6 +47,7 @@ async function main() {
   await fs.cp(path.join(root,'vendor/poem-static'),path.join(poemDir,'static'),{recursive:true});
   const backend=path.join(resources,'backend');
   await fs.mkdir(backend,{recursive:true});
+  await fs.cp(path.join(root,'model-instructions'),path.join(backend,'model-instructions'),{recursive:true});
   const backendDesktop=path.join(backend,'desktop');
   if(!backendDesktop.startsWith(path.join(root,'src-tauri/resources')+path.sep))throw Error('Unsafe backend staging path');
   await fs.rm(backendDesktop,{recursive:true,force:true});
