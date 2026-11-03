@@ -1,6 +1,6 @@
 {
   "name": "atlaschat-tauri",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "description": "AtlasChat Tauri 2 desktop",
   "scripts": {

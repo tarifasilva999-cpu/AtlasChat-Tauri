@@ -81,7 +81,8 @@ test('SSE survives split UTF-8 and CRLF, ignores heartbeat comments, and surface
 function fakeRunner(fetchImpl, events = []) {
   const runner = new NativeInference({ directory: path.join(os.tmpdir(), 'unused-atlas-native'), fetchImpl, emit: event => events.push(event) });
   const child = new EventEmitter(); child.exitCode = null; child.kill = () => { child.exitCode = 0; child.emit('exit', 0); return true; };
-  runner.server = { child, port: 12345, apiKey: 'test-secret', lease: 'test-lease' };
+  runner.server = { child, port: 12345, apiKey: 'test-secret', lease: 'test-lease',
+    choice: 'apex-ultra', instructions: { marker: 'ATLAS_MODEL_PROFILE:atlas-7.5:v1', prompt: 'ATLAS_MODEL_PROFILE:atlas-7.5:v1' } };
   runner.ready = { key: 'apex-ultra:8192' };
   return runner;
 }
@@ -174,6 +175,15 @@ test('failed GPU startup retries identical weights on CPU and reports actual run
   assert.equal(loaded.choice, 'apex-ultra'); assert.equal(loaded.verified, true);
   assert.ok(events.some(event => event.phase === 'cpu-fallback'));
   await runner.unload();
+});
+test('a runner that rejects its properties request fails promptly', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+  child.exitCode = 0; child.kill = () => true;
+  const runner = new NativeInference({ directory: os.tmpdir(), spawnImpl: () => child,
+    fetchImpl: async url => url.endsWith('/health') ? new Response('', { status: 200 }) : new Response('', { status: 500 }) });
+  await assert.rejects(runner.startServer({ server: path.join(os.tmpdir(), 'llama-server'), backend: 'cpu' }, 'model.gguf', 4096, true, new AbortController().signal), /could not report its context size/);
+  await runner.stopServer();
 });
 test('setup can be cancelled before any engine exists and does not emit false readiness', async t => {
   const directory = await fs.mkdtemp(path.join(TEST_ROOT, '.atlas-native-cancel-'));

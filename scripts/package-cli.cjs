@@ -21,7 +21,7 @@ async function main() {
   await fs.mkdir(path.join(stage, 'node'), { recursive: true });
   await fs.mkdir(path.join(stage, 'node_modules'), { recursive: true });
 
-  for (const name of ['cli.cjs', 'native-inference.cjs', 'native-download.cjs', 'native-catalog.cjs']) {
+  for (const name of ['cli.cjs', 'native-inference.cjs', 'native-download.cjs', 'native-catalog.cjs', 'model-instructions.cjs']) {
     await fs.copyFile(path.join(root, 'desktop', name), path.join(stage, 'desktop', name));
   }
   await fs.cp(path.join(root, 'model-instructions'), path.join(stage, 'model-instructions'), { recursive: true });

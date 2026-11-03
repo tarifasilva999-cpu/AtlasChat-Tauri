@@ -36,8 +36,9 @@ async function loadModelInstructions(choice, { root = PROFILE_ROOT } = {}) {
 
 function withModelInstructions(messages, choice, profile) {
   const marker = profile?.marker || markerForChoice(choice);
-  if (messages.some(message => message.role === 'system' && message.content.includes(marker))) return messages;
-  return [{ role: 'system', content: profile?.prompt || marker }, ...messages];
+  const systems = messages.filter(message => message.role === 'system').map(message => message.content);
+  if (!systems.some(content => content.includes(marker))) systems.unshift(profile?.prompt || marker);
+  return [{ role: 'system', content: systems.join('\n\n') }, ...messages.filter(message => message.role !== 'system')];
 }
 
 module.exports = { PROFILES, PROFILE_ROOT, profileForChoice, markerForChoice, loadModelInstructions, withModelInstructions };

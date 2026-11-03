@@ -142,7 +142,7 @@ class NativeInference {
         await fs.mkdir(this.directory, { recursive: true });
         const modelPath = await this.modelFiles(choice, model, controller.signal);
         await this.stopServer();
-        let lastError;
+        let lastError, graphicsError;
         // Falling back changes the hardware path, never the selected weights.
         for (const cpu of [false, true]) {
           controller.signal.throwIfAborted();
@@ -164,10 +164,11 @@ class NativeInference {
             lastError = error; await this.stopServer();
             if (controller.signal.aborted) throw controller.signal.reason;
             if (cpu) break;
+            graphicsError = error;
             this.notify('cpu-fallback', 'The graphics path could not start. Trying this model with the processor…');
           }
         }
-        throw failure(`Atlas could not start its desktop model. ${String(lastError?.message || '').slice(0,300)}`);
+        throw failure(`Atlas could not start its desktop model. Graphics: ${String(graphicsError?.message || 'unavailable').slice(0,300)} Processor: ${String(lastError?.message || 'unavailable').slice(0,300)}`);
       } catch (error) {
         await this.stopServer();
         this.phase = controller.signal.aborted ? 'stopped' : 'error';
@@ -212,19 +213,27 @@ class NativeInference {
     while (Date.now() - started < 180000) {
       signal.throwIfAborted();
       if (server.exitError) throw server.exitError;
+      let health;
       try {
-        const health = await this.fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.any([signal, AbortSignal.timeout(1500)]) });
-        if (health.ok) {
-          const properties = await this.fetch(`http://127.0.0.1:${port}/props`, {
-            headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(3000)]) });
+        health = await this.fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.any([signal, AbortSignal.timeout(1500)]) });
+      } catch (error) { if (signal.aborted) throw signal.reason; }
+      if (health?.ok) {
+          let properties;
+          try {
+            properties = await this.fetch(`http://127.0.0.1:${port}/props`, {
+              headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(3000)]) });
+          } catch (error) {
+            if (signal.aborted) throw signal.reason;
+            await pause(250, undefined, { signal });
+            continue;
+          }
           if (!properties.ok) throw failure('The local runner could not report its context size.');
           const props = await properties.json();
           const actualContext = Number(props.default_generation_settings?.n_ctx);
           if (!Number.isInteger(actualContext) || actualContext < 512 || actualContext > 32768) throw failure('The local runner reported an invalid context size.');
           server.contextWindow = actualContext;
           return { lease, contextWindow: actualContext, backend: `native-${!cpu && server.offloaded > 0 ? runtime.backend : 'cpu'}`, runtime: runtime.key };
-        }
-      } catch (error) { if (signal.aborted) throw signal.reason; }
+      }
       await pause(250, undefined, { signal });
     }
     throw failure('The model could not finish loading into memory within three minutes.', 'TIMEOUT');

@@ -124,7 +124,7 @@
           <span class="model-picker-trigger-copy"><strong id="modelPickerCurrent">Loading…</strong></span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
         </button>
-        <button type="button" class="effort-picker-trigger" id="effortPickerTrigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="effortPicker"><span id="effortPickerCurrent">Medium</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+        <button type="button" class="effort-picker-trigger" id="effortPickerTrigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="effortPicker"><span class="effort-picker-label">Effort</span><span id="effortPickerCurrent">Medium</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
         <div class="image-format-controls" id="imageFormatControls" hidden>
           <select id="imageAspectRatio" aria-label="Image aspect ratio" title="Image aspect ratio">
             <option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="3:4">3:4</option><option value="2:3">2:3</option><option value="9:16">9:16</option>
@@ -173,10 +173,9 @@
           <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
         </button>
         <textarea id="input" rows="1" aria-label="Message Atlas" placeholder="Imagine anything" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mentionMenu"></textarea>
-    </div>
-    <div class="composer-controls">
+      <div class="composer-controls">
       <button class="composer-attach" id="attachmentAdd" type="button" aria-label="Attach files" title="Attach files">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20.4 11.1-8.7 8.7a5.2 5.2 0 0 1-7.4-7.4l9.1-9.1a3.5 3.5 0 0 1 5 5l-9.2 9.2a1.7 1.7 0 0 1-2.4-2.4l8.4-8.4"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 12v6m-3-3h6"/></svg><span class="attach-label">Attach</span>
       </button>
       <div class="attachment-info-wrap" id="attachmentInfoWrap">
         <button class="attachment-info" id="attachmentInfo" type="button" aria-label="About files" title="About files" aria-expanded="false" aria-controls="attachmentInfoPopover" aria-describedby="attachmentInfoPopover">
@@ -200,6 +199,7 @@
       <button class="send" id="send" aria-label="Send">
         <svg viewBox="0 0 24 24"><path d="M12 18.5v-13M6.75 10.75 12 5.5 17.25 10.75"/></svg>
       </button>
+      </div>
     </div>
     </div>
       <p class="composer-note">Your chats stay on this device</p>
@@ -2074,7 +2074,7 @@
     railStatus.disabled=kind!=="error";railStatus.setAttribute("aria-label",label);railStatus.title=label;railStatus.setAttribute("aria-expanded","false");
     modelErrorPopover.hidden=true;
     if(kind==="error"){
-      modelErrorDetails.textContent="Atlas couldn’t prepare this model. Try another model or reload Atlas.";
+      modelErrorDetails.textContent=String(detail||"Atlas couldn’t prepare this model. Try again or choose another Atlas model.").slice(0,1000);
       send.disabled=true;send.classList.add("model-error");
     }else{
       send.classList.remove("model-error");
