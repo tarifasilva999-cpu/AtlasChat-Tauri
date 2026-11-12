@@ -2752,6 +2752,15 @@
     return !/^\s*(?:\.\.\.|TODO|your code here)\s*$/im.test(snippet);
   }
 
+  function containsUnsupportedToolCallSyntax(raw){
+    const text=String(raw||"");
+    return /<\|(?:tool_call|tool_result|tool_response)(?:\|)?>/i.test(text)||
+      /\bcall:(?:CodeEdit|CodeInterpreter)\s*\{/i.test(text)||
+      /\b(?:file_path|old_string|new_string)\s*:\s*<\|/i.test(text);
+  }
+
+  const INVALID_CODE_DRAFT_MESSAGE="Atlas emitted a fake CodeEdit command instead of an updated snippet. I discarded that draft; no code or files were changed. Please resend the request to try again.";
+
   function normalizeCodeResponse(raw,request,codeContinuation=false,languageOverride=""){
     const text=String(raw||"").trim();
     if((!isCodeRequest(request)&&!codeContinuation)||!text||!hasUsableCodeResponse(text,request))return text;
@@ -3406,7 +3415,7 @@
     const t=String(text||"").trim().toLowerCase();
     const asksCurrent=/\b(latest|right now|currently|today|this week|recent news|breaking news|current (?:news|events|price|score|weather|version|release|leader|president|ceo|status))\b/.test(t);
 
-    if(codeContinuation)return "CODE CONTINUATION: The latest request modifies the code from the immediately preceding assistant response. Treat that previous complete code block as the source of truth. Implement every requested change and return the FULL updated solution in one fenced block using the same language as the previous code. Preserve existing behavior unless the user asks to change it. Add only a brief factual summary after the code. Do not answer with a plan, diff-only patch, mockup, inline visual, `atlas-ui`, or `atlas-plan`. If the previous code is missing from the supplied conversation context, ask the user to paste it instead of inventing a replacement."+
+    if(codeContinuation)return "CODE CONTINUATION: The latest request modifies the code from the immediately preceding assistant response. Treat that previous complete code block as the source of truth. Implement every requested change and return the FULL updated solution in one fenced block using the same language as the previous code. Preserve existing behavior unless the user asks to change it. Add only a brief factual summary after the code. Do not answer with a plan, diff-only patch, mockup, inline visual, `atlas-ui`, or `atlas-plan`. Never emit tool-call tokens, `CodeEdit` or `CodeInterpreter` calls, JSON tool arguments, `file_path`/`old_string`/`new_string` patch envelopes, or claims that a file was changed. No code-edit tool is available in this reply; return the complete source snippet only. If the previous code is missing from the supplied conversation context, ask the user to paste it instead of inventing a replacement."+
       (isFileRequest(t)?" If a downloadable file is requested, use one complete `file:filename.ext` block with the updated code.":"");
 
     if(isFileRequest(t))return "FILE OUTPUT: Create the requested downloadable file, not just a code example. Put each complete file in its own fenced block beginning exactly with ```file:filename.ext and ending with ```; put only that file's contents inside. Choose a clear filename and a text-based format such as TXT, Markdown, HTML, CSS, JavaScript, TypeScript, Python, JSON, CSV, YAML, or SVG. Avoid triple-backtick fences inside file contents (use tildes in Markdown files). For PDF, DOCX, XLSX, or other binary formats, explain that Atlas cannot export that format yet and offer a text-based alternative. Never claim the file was tested or executed.";
@@ -3416,7 +3425,7 @@
     }
 
     if(isCodeRequest(t)){
-      return "CODE: Solve the exact programming request with complete runnable code. Include imports, setup, the requested interactions and cleanup. Check API names, variable definitions, indentation, and control flow before answering. Use this order: a descriptive `# Title`, one fenced code block with the correct language, `## What it does` with brief factual bullets, then `## Suggested additions` with one to three short, concrete features that could be added to this code. Never replace the code with a tutorial, pseudocode, placeholders, or partial fragments. Do not say to try it and ask for changes."+
+      return "CODE: Solve the exact programming request with complete runnable code. Include imports, setup, the requested interactions and cleanup. Check API names, variable definitions, indentation, and control flow before answering. Use this order: a descriptive `# Title`, one fenced code block with the correct language, `## What it does` with brief factual bullets, then `## Suggested additions` with one to three short, concrete features that could be added to this code. Never replace the code with a tutorial, pseudocode, placeholders, or partial fragments. Do not say to try it and ask for changes. Never emit tool-call tokens, `CodeEdit` or `CodeInterpreter` calls, JSON tool arguments, `file_path`/`old_string`/`new_string` patch envelopes, or claims that a file was changed. Use only an actual tool explicitly supplied by Atlas; otherwise return source code."+
         (asksCurrent?" Atlas cannot verify the latest API version offline; state any version assumption briefly.":"");
     }
 
@@ -3840,7 +3849,9 @@ Local date/time: ${current}.${global}${local}`
       const latestUser=[...c.messages].reverse().find(message=>message.role==="user");
       const latest=String(latestUser?.content||"");
       const codeContinuation=Boolean(latestUser?.codeContinuation);
-      const finalText=m?.stopped?generated+"\n\n_Reply stopped._":normalizeCodeResponse(generated,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
+      const codeTask=isCodeRequest(latest)||codeContinuation;
+      const finalText=codeTask&&containsUnsupportedToolCallSyntax(generated)?INVALID_CODE_DRAFT_MESSAGE:
+        m?.stopped?generated+"\n\n_Reply stopped._":normalizeCodeResponse(generated,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
       pushToChat(c,"assistant",finalText,{modelName:modelChoiceNames[job.choice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
       if(c.id!==state.activeChatId)showToast(`Reply finished in ${displayTitle(c)}`);
       if(c.id===state.activeChatId)renderCurrent();
@@ -4450,7 +4461,9 @@ Local date/time: ${current}.${global}${local}`
       const latest=String(latestUser?.content||"");
       const codeContinuation=Boolean(latestUser?.codeContinuation);
       const stoppedText=(generatedText.match(/```/g)||[]).length%2?generatedText+"\n```":generatedText;
-      const finalText=m.stopped?stoppedText+"\n\n_Reply stopped._":normalizeCodeResponse(generatedText,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
+      const codeTask=isCodeRequest(latest)||codeContinuation;
+      const finalText=codeTask&&containsUnsupportedToolCallSyntax(generatedText)?INVALID_CODE_DRAFT_MESSAGE:
+        m.stopped?stoppedText+"\n\n_Reply stopped._":normalizeCodeResponse(generatedText,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
       if(generatedText||!m.stopped)pushToChat(chat,"assistant",finalText,{modelName:modelChoiceNames[state.pendingModelChoice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
 
       if(m.backend) state.backend=m.backend;
