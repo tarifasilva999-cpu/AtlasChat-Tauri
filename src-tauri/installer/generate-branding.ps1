@@ -10,12 +10,15 @@ function New-InstallerArtwork([string]$Name, [int]$Width, [int]$Height, [bool]$S
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
-    $ink = if ($Sidebar) { [System.Drawing.Color]::White } else { [System.Drawing.Color]::FromArgb(24, 24, 26) }
-    $background = if ($Sidebar) { [System.Drawing.Color]::FromArgb(16, 16, 17) } else { [System.Drawing.Color]::White }
+    $ink = [System.Drawing.Color]::FromArgb(246, 244, 255)
+    $background = if ($Sidebar) { [System.Drawing.Color]::FromArgb(15, 14, 19) } else { [System.Drawing.Color]::FromArgb(20, 19, 25) }
     $graphics.Clear($background)
+    $glow = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(30, 133, 84, 255))
+    $graphics.FillEllipse($glow, $(if ($Sidebar) { -74 } else { 72 }), -70, 220, 220)
+    $glow.Dispose()
     $brush = [System.Drawing.SolidBrush]::new($ink)
     $muted = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(168, 164, 176))
-    $accent = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(105, 0, 255))
+    $accent = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(169, 123, 255))
     $font = [System.Drawing.Font]::new($family, $(if ($Sidebar) { 19 } else { 17 }), [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
     $small = [System.Drawing.Font]::new($family, 11, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
     $pen = [System.Drawing.Pen]::new($ink, $(if ($Sidebar) { 3.5 } else { 1.7 }))
@@ -26,7 +29,7 @@ function New-InstallerArtwork([string]$Name, [int]$Width, [int]$Height, [bool]$S
             $graphics.DrawEllipse($pen, 46, 126, 8, 8)
             $graphics.DrawString('AtlasChat', $font, $brush, 19, 177)
             $graphics.DrawString("Your ideas.`nYour device.", $small, $muted, 20, 211)
-            $graphics.FillRectangle($accent, 20, 279, 28, 3)
+            $graphics.FillRectangle($accent, 20, 279, 34, 3)
         } else {
             $graphics.DrawEllipse($pen, 8, 16, 7, 7)
             $graphics.DrawEllipse($pen, 16, 24, 17, 17)

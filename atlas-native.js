@@ -4,7 +4,7 @@
   window.createAtlasNativeAdapter = (Base, settings) => {
     const bridge = window.atlasDesktop;
     if (!bridge?.inferenceLoad) throw new Error('Atlas desktop components are out of date. Close Atlas and reopen it from the updated folder.');
-    const { state, contextWindowForChoice, isPlanCandidate, isCodeRequest, choice: initialChoice, runtimeId } = settings;
+    const { state, contextWindowForChoice, isPlanCandidate, isCodeRequest, hasUsableCodeResponse, choice: initialChoice, runtimeId } = settings;
     const legacyIds = { 'apex-ultra': 'atlas-native-chat', 'ultra-code': 'atlas-native-code',
       forge: 'atlas-native-mini', firefly: 'atlas-native-mini' };
     const choiceFrom = (model, fallback) => model.choice ||
@@ -178,6 +178,17 @@
           }
           if (epoch !== this.generationEpoch) return;
           if (!full.trim() && !this.interrupted) throw new Error('Apex returned an empty response.');
+          if (!this.interrupted && kind === 'code' && hasUsableCodeResponse && !hasUsableCodeResponse(full, latest)) {
+            this._emit({ type: 'reply-phase', id: message.id, message: 'Fixing the code response…' });
+            const retry = await engine.chat.completions.create({ messages: [
+              { role: 'system', content: 'Return complete, runnable code that fulfills the request, in a fenced code block. Do not substitute a description, pseudocode, or placeholders for code.' },
+              { role: 'user', content: latest }
+            ], max_tokens: message.maxNewTokens || 2048, temperature: 0.2, _atlasKind: 'code' });
+            if (epoch !== this.generationEpoch) return;
+            const corrected = String(retry.choices?.[0]?.message?.content || '').trim();
+            if (!hasUsableCodeResponse(corrected, latest)) throw new Error('Atlas could not produce usable code for this request. Try again or break the task into smaller parts.');
+            full = corrected;
+          }
           this._emit({ type: 'done', id: message.id, text: full.trim() || 'Stopped.', stopped: this.interrupted,
             truncated: finishReason === 'length', backend: this.nativeMeta?.backend || 'native',
             modelId: this.modelId, variant: this.variant, verified: true });

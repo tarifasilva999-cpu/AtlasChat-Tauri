@@ -18,6 +18,10 @@
 <link rel="apple-touch-icon" sizes="496x496" href="./icons/AtlasChat Mobile.png" />
 </head>
 <body data-atlas-build="B21" data-atlas-runtime="v2" data-atlas-schema="v1">
+<div class="startup-splash" id="startupSplash" role="status" aria-label="Starting AtlasChat">
+  <div class="startup-splash-inner"><img src="./icons/Brand/Chat White.png" alt=""><strong>AtlasChat</strong><span>Starting your workspace</span><div class="startup-splash-progress"></div></div>
+</div>
+<script>setTimeout(()=>document.getElementById('startupSplash')?.classList.add('finished'),12000);</script>
 <div class="app" id="app">
   <aside class="rail">
     <button class="rail-button" id="railToggle" aria-label="Open sidebar" title="Chats">
@@ -741,7 +745,8 @@
       memory:Array.isArray(c?.memory)?c.memory:[],
       contextSummary:typeof c?.contextSummary==="string"?c.contextSummary:"",
       summarizedThrough:Math.max(0,Number(c?.summarizedThrough)||0)
-      ,projectId:typeof c?.projectId==="string"?c.projectId:null
+      ,projectId:typeof c?.projectId==="string"?c.projectId:null,
+      scratchWorkspaceId:typeof c?.scratchWorkspaceId==="string"?c.scratchWorkspaceId:null
     };
   }
 
@@ -1698,7 +1703,7 @@
   }
 
   const createAiAdapter=(choice,runtimeId)=>window.atlasDesktop
-    ? window.createAtlasNativeAdapter(AtlasWebLLMAdapter,{state,contextWindowForChoice,isPlanCandidate,isCodeRequest,choice,runtimeId})
+    ? window.createAtlasNativeAdapter(AtlasWebLLMAdapter,{state,contextWindowForChoice,isPlanCandidate,isCodeRequest,hasUsableCodeResponse,choice,runtimeId})
     : new AtlasWebLLMAdapter(choice);
   let ai=createAiAdapter(state.modelChoice,"primary");
   let secondaryAi=null,secondaryChatId=null,secondaryJob=null;
@@ -2694,6 +2699,7 @@
   function hasUsableCodeResponse(raw,request){
     const snippet=extractCodeSnippet(raw);
     if(snippet.length<8||!snippet.split(/\r?\n/).some(isLikelyCodeLine))return false;
+    if(/\b(html|website|webpage)\b/i.test(request)&&!/<(?:!doctype\s+html|html|head|body|main|div|canvas|script|style)\b/i.test(snippet.replace(/<!--[\s\S]*?-->/g,"")))return false;
     for(const name of ["pygame","tkinter","numpy","pandas","flask","react"]){
       if(new RegExp(`\\b${name}\\b`,"i").test(request)&&
          !new RegExp(`\\b${name}\\b`,"i").test(snippet))return false;
@@ -4373,7 +4379,7 @@ Local date/time: ${current}.${global}${local}`
       const statusTail=consumeModelStatus("",true);if(statusTail)state.pendingText+=statusTail;
       const chat=state.chats.find(item=>item.id===state.pendingChatId);
       if(!chat)return;
-      const generatedText=String(state.pendingText||"").trim()||(m.stopped?"":"…");
+      const generatedText=stripModelStatusMarkers(m.text||state.pendingText||"").trim()||(m.stopped?"":"…");
       const latest=[...chat.messages].reverse().find(message=>message.role==="user")?.content||"";
       const stoppedText=(generatedText.match(/```/g)||[]).length%2?generatedText+"\n```":generatedText;
       const finalText=m.stopped?stoppedText+"\n\n_Reply stopped._":normalizeCodeResponse(generatedText,latest);
@@ -5370,6 +5376,7 @@ Local date/time: ${current}.${global}${local}`
   }else{
     setRailStatus("error","Atlas couldn't find the interface controls needed to start.");
   }
+  document.getElementById("startupSplash")?.classList.add("finished");
 
   window.addEventListener("beforeunload",()=>{
     try{ai.postMessage({type:"dispose"})}catch{}

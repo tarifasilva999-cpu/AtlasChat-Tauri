@@ -1357,7 +1357,8 @@
     container.classList.add('coding-project');
     container.dataset.taskError=message.projectTaskError||'';
     container.dataset.projectTaskId=message.projectTaskId||'';
-    if (!message.projectRunId) {
+    const workspaceId = message.projectRunId || message.scratchRunId;
+    if (!workspaceId) {
       delete container.dataset.codingProject;
       container.dataset.codingPending = 'true'; container.replaceChildren();
       if (message.content === 'Coding model selection cancelled.') {
@@ -1368,14 +1369,14 @@
         if (pendingCoderLoad) { download.disabled = true; download.title = 'Waiting for the canceled model load to finish.'; }
         download.onclick = () => run(message.codingRequest || '', message, true);
         row.append(download); container.append(row);
-      } else container.textContent = message.content;
+      } else container.textContent = message.content || message.projectTaskError || 'This coding task did not produce a result. Please try again.';
       return;
     }
     if (!bridge) { container.textContent = message.content + '\nOpen the desktop app to access this project.'; return; }
-    container.dataset.codingProject = message.projectRunId;
-    const existing = cache.get(message.projectRunId);
+    container.dataset.codingProject = workspaceId;
+    const existing = cache.get(workspaceId);
     if (existing) draw(container, existing); else container.textContent = 'Opening project…';
-    bridge.read(message.projectRunId).then(run => { cache.set(run.id, run); if (container.isConnected) draw(container, run); })
+    bridge.read(workspaceId).then(run => { cache.set(run.id, run); if (container.isConnected) draw(container, run); })
       .catch(() => { container.textContent = 'Project files are unavailable on this device. Restore the desktop backup bundle to recover them.'; });
   }
   function mount(value) {

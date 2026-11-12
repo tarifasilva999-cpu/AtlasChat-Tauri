@@ -153,6 +153,31 @@ test('renderer adapter uses native chat and coding APIs without importing WebLLM
   await adapter._dispose();
 });
 
+test('native adapter retries a code description and returns the corrected final answer', async () => {
+  const listeners = new Set(), events = [], requests = [];
+  const bridge = {
+    onInference: fn => { listeners.add(fn); return () => listeners.delete(fn); },
+    inferenceLoad: async () => ({ label: 'Atlas', lease: 'lease', contextWindow: 8192 }),
+    inferenceComplete: async request => {
+      requests.push(request);
+      const text = requests.length === 1 ? 'A description, but no code.' : '<html><body>Hello</body></html>';
+      for (const fn of [...listeners]) fn({ type: 'chunk', runtimeId: request.runtimeId, id: request.id, chunk: { choices: [{ delta: { content: text }, finish_reason: 'stop' }] } });
+      return { ok: true, text, finishReason: 'stop' };
+    }, inferenceUnload: async () => {}, inferenceCancel: async () => {}
+  };
+  const window = { atlasDesktop: bridge };
+  vm.runInNewContext(await fs.readFile(path.join(__dirname, '..', 'atlas-native.js'), 'utf8'), { window, crypto, queueMicrotask });
+  class Base { constructor() { this.generationEpoch = 1; } async _summarizeContext() { return ''; } }
+  const adapter = window.createAtlasNativeAdapter(Base, { state: { contextPreferences: {}, effort: 'max' }, contextWindowForChoice: () => 8192,
+    isPlanCandidate: () => false, isCodeRequest: () => true, hasUsableCodeResponse: text => text.includes('<html>'), choice: 'apex-ultra' });
+  adapter.onmessage = ({ data }) => events.push(data);
+  await adapter._load();
+  await adapter._generate({ id: 'reply:code', mode: 'code', messages: [{ role: 'system', content: 'Instructions' }, { role: 'user', content: 'Make HTML' }] });
+  assert.equal(requests.length, 2);
+  assert.ok(events.some(event => event.type === 'done' && event.text === '<html><body>Hello</body></html>'));
+  await adapter._dispose();
+});
+
 test('failed GPU startup retries identical weights on CPU and reports actual runner context', async t => {
   const directory = await fs.mkdtemp(path.join(TEST_ROOT, '.atlas-native-load-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

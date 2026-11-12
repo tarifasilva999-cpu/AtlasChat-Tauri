@@ -924,8 +924,36 @@ html[data-theme="light"] :is(.home-icon,.about-logo,.mobile-app-icon,.settings-m
  .new-chat-home p,.new-chat-prompts{display:none}
  .app:has(.new-chat-home) .composer-wrap{top:47.5%;bottom:auto;background:none}
  .app:has(.new-chat-home) .composer-note{display:none}
- .app:has(.new-chat-home) .model-picker,.app:has(.new-chat-home) .effort-picker{bottom:calc(52.5vh + 4px)!important}
 }
+/* Menus are positioned relative to their composer controls, including on the home screen. */
+.composer-dock>.composer .model-picker-anchor{position:relative!important}
+.composer-dock .model-picker,.composer-dock .effort-picker{left:auto!important;right:0!important}
+
+/* Startup and first-run setup */
+.startup-splash{position:fixed;inset:0;z-index:999;display:grid;place-items:center;background:#101013;color:#f6f4ff;transition:opacity .3s ease,visibility .3s ease}
+.startup-splash.finished{opacity:0;visibility:hidden;pointer-events:none}
+.startup-splash-inner{display:grid;justify-items:center;gap:12px;min-width:200px}
+.startup-splash-inner img{width:56px;height:56px;object-fit:contain}
+.startup-splash-inner strong{font:600 24px/1.2 var(--sans);letter-spacing:-.7px}
+.startup-splash-inner span{color:#a6a1b3;font-size:13px}
+.startup-splash-progress{width:150px;height:3px;margin-top:12px;overflow:hidden;border-radius:5px;background:#2d2934}
+.startup-splash-progress:after{display:block;width:40%;height:100%;content:"";background:#a777ff;animation:progress 1.5s infinite}
+.setup-overlay{background:radial-gradient(ellipse at 50% 10%,#29203c 0,#121116 52%,#0d0d10 100%);color:#f6f4ff}
+.setup-content{width:min(540px,100%);padding:36px;border:1px solid #ffffff18;border-radius:24px;background:#1b1a21;box-shadow:0 28px 80px #0007}
+.setup-overline{display:inline-flex;margin-bottom:24px;padding:6px 10px;border:1px solid #b995ff44;border-radius:999px;color:#c9adff;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.setup-content h1{font-family:var(--sans);font-size:clamp(28px,4vw,38px);font-weight:600;letter-spacing:-1px}
+.setup-copy{color:#b9b3c3;font-size:14px;line-height:1.6;margin:12px 0 26px}
+.setup-progress-track{height:6px;background:#34313c;border-radius:99px}
+.setup-progress-bar{background:linear-gradient(90deg,#8862ef,#c69cff);border-radius:99px}
+.setup-steps{margin-top:24px;border:1px solid #ffffff12;border-radius:16px;overflow:hidden}
+.setup-step{min-height:54px;padding:10px 14px;gap:12px;background:#ffffff05}
+.setup-step+.setup-step{border-top:1px solid #ffffff0d}
+.setup-step-dot{width:22px;height:22px;border-color:#665978;color:#c9adff}
+.setup-step.active .setup-step-dot{background:#9e76ef;border-color:#b998ff}
+.setup-step-detail,.setup-foot{color:#aaa3b5;font-size:12px}
+.setup-foot{line-height:1.55;margin-top:20px}
+@media(max-width:600px){.setup-content{padding:24px 20px;border-radius:20px}.setup-step{flex-wrap:wrap}.setup-step-detail{max-width:55%;overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.startup-splash{transition:none}.startup-splash-progress:after{animation:none;width:100%}}
 @media(max-width:900px) and (min-width:761px){.settings-panel{width:calc(100vw - 48px)}.settings-layout{grid-template-columns:160px minmax(0,1fr)}.settings-content{padding:24px}}
 @media(max-width:760px){
  :root{--sidebar-w:min(86vw,320px);--header-h:calc(60px + env(safe-area-inset-top))}
