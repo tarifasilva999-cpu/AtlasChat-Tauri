@@ -1,7 +1,14 @@
 'use strict';
 (() => {
   if (window !== window.top || !window.__TAURI__) return;
-  const call = (name,value) => window.__TAURI__.core.invoke('atlas_call',{name,value:value??null});
+  const call = async (name, value) => {
+    try {
+      return await window.__TAURI__.core.invoke('atlas_call', {name, value: value ?? null});
+    } catch (error) {
+      if (typeof error === 'string') throw new Error(error);
+      throw error;
+    }
+  };
   const listeners = new Set();
   const connected = window.__TAURI__.event.listen('atlas-inference',event=>{for(const listener of listeners)listener(event.payload)});
   const names = ['info','create','createScratch','inferenceInfo','inferenceLoad','inferenceComplete','inferenceCancel','inferenceUnload','imagePrepare','imageGenerate','imageCancel','read','source','save','event','model','check','cancel','finish','exportProject','preview','exportBackup','importBackup','research','chooseCoder','windowAction','projects','deleteProject','projectCommand','importProject'];
