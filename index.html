@@ -3945,7 +3945,7 @@ Local date/time: ${current}.${global}${local}`
       queueReplyForLoad();void ai._dispose().finally(()=>{state.loading=false;startPreload();});return;
     }
     if(latestUser?.mentions?.includes("ultra-code")&&window.atlasDesktop&&(choice==="apex-ultra"||choice==="ultra-code")&&window.AtlasCoding?.run){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,true,false,false,c.id);return;}
-    if(!codeContinuation&&window.AtlasCoding?.shouldRun(latest,c)){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,false,false,false,c.id);return;}
+    if(window.AtlasCoding?.shouldRun(latest,c,codeContinuation)){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,false,false,false,c.id);return;}
     pendingProjectContextChatId=c.id;
     let projectContext="";
     try{projectContext=await window.AtlasCoding?.projectContextForChat?.(c.id,latest)||"";}

@@ -157,6 +157,15 @@ app.whenReady().then(async () => {
     if(checking.has(id)&&commands.some(c=>mutations.includes(c.name)))throw new Error('Wait for verification to finish before editing.');
     if(['BUILD','RUN','RUN_TESTS','RUN_BROWSER_TEST'].includes(value.name))return execute(id);
     if(value.name==='EXPORT_ZIP')return exportProject(id);
+    if(value.name==='SAVE_CODING_ARTIFACT')return store.saveCodingArtifact(id,value.args?.previousSourceHash,value.args?.sourceHash);
+    if(value.name==='DOWNLOAD_CODING_ARTIFACT'){
+      const filename=value.args?.filename;
+      const data=await store.readCodingArtifact(id,filename);
+      const choice=await dialog.showSaveDialog(win,{defaultPath:filename});
+      if(choice.canceled||!choice.filePath)return false;
+      await fs.writeFile(choice.filePath,data);
+      return true;
+    }
     if(value.name==='SCREENSHOT')return {dataUrl:'data:image/png;base64,'+(await fs.readFile(path.join(store.dir(id),'preview.png'))).toString('base64')};
     return store.command(value);
   });

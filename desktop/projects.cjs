@@ -501,5 +501,32 @@ class ProjectManager extends Store {
     if(!source.length)throw new Error('ZIP contains no files.');const run=await this.create({title,...detect(source)});await this.save(run.id,source,0);const imported=await this.read(run.id);imported.directories=directories;await this.put(imported);return this.read(run.id);
   }
   async zip(id) { return this.locked(id,async()=>{await this._state(id);return fs.readFile(path.join(this.dir(id),'project.zip'));}); }
+  async saveCodingArtifact(id, previousSourceHash, sourceHash) {
+    return this.locked(id, async () => {
+      const {run, source} = await this._state(id);
+      if (!run.temporary || !source.length || run.sourceHash === previousSourceHash) return null;
+      if (run.sourceHash !== sourceHash) throw new Error('Workspace changed before the download was saved.');
+      let filename, data;
+      if (source.length === 1) {
+        filename = path.posix.basename(source[0].path);
+        data = bytes(source[0]);
+      } else {
+        const title = run.title.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '');
+        filename = `atlas-${title || 'project'}.zip`;
+        data = await fs.readFile(path.join(this.dir(id), 'project.zip'));
+      }
+      const artifactId = crypto.randomUUID();
+      const directory = path.join(path.dirname(this.root), 'coding-artifacts', artifactId);
+      await fs.mkdir(directory, {recursive: true});
+      await fs.writeFile(path.join(directory, filename), data, {flag: 'wx'});
+      return {id: artifactId, filename, bytes: data.length, fileCount: source.length};
+    });
+  }
+
+  async readCodingArtifact(id, filename) {
+    runId(id);
+    if (path.posix.basename(projectPath(filename)) !== filename) throw new Error('Invalid download name.');
+    return fs.readFile(path.join(path.dirname(this.root), 'coding-artifacts', id, filename));
+  }
 }
 module.exports={ProjectManager,validateFiles,validateCommands,detect,complexity,sourceFromZip,POLICIES,LIMITS,SCRATCH_ID_PREFIX,SCRATCH_TTL_MS};

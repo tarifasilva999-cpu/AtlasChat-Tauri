@@ -8,20 +8,35 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { ProjectManager } = require('./projects.cjs');
-const element = () => ({ dataset: {}, append() {}, setAttribute() {}, classList: { add() {} } });
-async function workspace(t, check) {
+const element = tagName => ({
+  tagName, dataset: {}, children: [],
+  append(...items) { this.children.push(...items); },
+  replaceChildren(...items) { this.children = items; },
+  setAttribute() {}, classList: { add() {}, remove() {} }
+});
+async function workspace(t, check, {persistent = true, singleFile = false} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-workflow-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const store = new ProjectManager(root); await store.init();
+  const store = new ProjectManager(path.join(root, 'projects')); await store.init();
   const chat = { id:'chat-a', messages: [{ role: 'user', content: 'Build a Python project' }] };
+  if (persistent) chat.projectId = (await store.create({title:'Example',runtime:'python',entrypoint:'main.py'})).id;
   const state = { modelChoice: 'apex-ultra', generating: false, loaded: true, chats:[chat], activeChatId:chat.id };
   let checks = 0, cancelled = false, sourceWrites = 0;
+  const downloads = [];
   const bridge = {
     info: async () => ({ researchConfigured: false }),
-    create: value => store.create(value), read: id => store.read(id), source: id => store.source(id),
+    createScratch: value => store.createScratch(value), read: id => store.read(id), source: id => store.source(id),
     model: async value => { const run = await store.read(value.id); run.actualModel = value.model; await store.put(run); return run; },
     event: value => store.event(value.id, value),
-    projectCommand: value => { if(['WRITE_FILE','CREATE_FILE','PATCH_FILE'].includes(value.name))sourceWrites++;return store.command(value); },
+    projectCommand: async value => {
+      if (value.name === 'SAVE_CODING_ARTIFACT') return store.saveCodingArtifact(value.id, value.args.previousSourceHash, value.args.sourceHash);
+      if (value.name === 'DOWNLOAD_CODING_ARTIFACT') {
+        downloads.push(await store.readCodingArtifact(value.id, value.args.filename));
+        return true;
+      }
+      if(['WRITE_FILE','CREATE_FILE','PATCH_FILE'].includes(value.name))sourceWrites++;
+      return store.command(value);
+    },
     save: value => { sourceWrites++; return store.save(value.id, value.files); },
     check: async id => {
       checks++;
@@ -40,12 +55,13 @@ async function workspace(t, check) {
     async create({ messages }) {
       const prompt = messages[1].content;
       let output;
-      if (prompt.startsWith('Plan this')) output = JSON.stringify({ title: 'Example', runtime: 'python', entrypoint: 'main.py',architecture:'main.py exposes hello; unittest tests it.',
-        summary: 'Write a small program and test it.', files: [{ path: 'main.py', purpose: 'program' }, { path: 'test_main.py', purpose: 'test' }], researchQuery: '' });
+      if (prompt.startsWith('Plan this')) output = JSON.stringify({ title: 'Example', runtime: 'python', entrypoint: 'main.py',architecture:'main.py is the program entrypoint.',
+        summary: 'Write a small program.', files: [{ path: 'main.py', purpose: 'program' }, ...(!singleFile ? [{ path: 'test_main.py', purpose: 'test' }] : [])] });
       else if(prompt.startsWith('Project task:')){
-        const sources=chat.projectId?await store.source(chat.projectId):[];
-        if(!sources.length)output=JSON.stringify({commands:[{name:'CREATE_FILE',args:{path:'main.py',content:'print("hello")\n'}},{name:'CREATE_FILE',args:{path:'test_main.py',content:'import unittest\n'}}],done:true});
-        else output=JSON.stringify({commands:[{name:'PATCH_FILE',args:{path:'main.py',search:'hello',replace:'repaired'}}],done:true});
+        const sources=await store.source(chat.projectId || chat.scratchWorkspaceId);
+        if(!sources.length)output=JSON.stringify({commands:[{name:'CREATE_FILE',args:{path:'main.py',content:'print("hello")\n'}},
+          ...(!singleFile ? [{name:'CREATE_FILE',args:{path:'test_main.py',content:'import unittest\n'}}] : [])],done:true,summary:'The script prints hello.'});
+        else output=JSON.stringify({commands:[{name:'PATCH_FILE',args:{path:'main.py',search:'hello',replace:'repaired'}}],done:true,summary:'The script prints the updated message.'});
       }else throw new Error('Unexpected inference prompt');
       return (async function* () { yield { choices: [{ delta: { content: output }, finish_reason: 'stop' }] }; })();
     }
@@ -64,7 +80,7 @@ async function workspace(t, check) {
   const coding = context.window.AtlasCoding;
   coding.mount({ state, ai, getChat: () => chat, push(role, content) { const m = { role, content }; chat.messages.push(m); return m; },
     persist() {}, render() {}, controls() {}, updateModels() {}, ready() {}, toast() {} });
-  return { coding, state, chat, store, checks: () => checks, cancelled: () => cancelled, writes: () => sourceWrites };
+  return { coding, state, chat, store, downloads, checks: () => checks, cancelled: () => cancelled, writes: () => sourceWrites };
 }
 test('a failed check repairs source and reruns, while snippets remain quick', async t => {
   const env = await workspace(t, async ({ attempt }) => attempt === 1
@@ -73,9 +89,7 @@ test('a failed check repairs source and reruns, while snippets remain quick', as
   assert.equal(env.coding.shouldRun('Build a Python project'), true);
   assert.equal(env.coding.shouldRun('Explain Python code'), false);
   assert.equal(env.coding.shouldRun('Show a small snippet'), false);
-  env.chat.projectId='existing-project';
   assert.equal(env.coding.shouldRun('Brainstorm how we could implement this, without changing files'),false);
-  env.chat.projectId=null;
   await env.coding.run('Build a Python project');
   const message = env.chat.messages.at(-1), run = await env.store.read(message.projectRunId);
   assert.equal(env.checks(), 2, env.chat.messages.at(-1).content);
@@ -127,10 +141,48 @@ test('follow-up chat reuses the canonical workspace and stops repeated repair ev
   assert.equal((await env.store.read(id)).tasks.length,2);
 });
 test('a busy project rejection does not finish or overwrite another chat task',async t=>{
-  const env=await workspace(t,async()=>({passed:true,executed:true,checks:[]}));
+  const env=await workspace(t,async()=>({passed:true,executed:true,checks:[]}),{persistent:false});
   const run=await env.store.create({title:'Busy',runtime:'python',entrypoint:'main.py'});env.chat.projectId=run.id;
   await env.store.command({id:run.id,name:'START_TASK',chatId:'other-chat',args:{request:'Implement feature'}});
   await env.coding.run('Build a Python project');
   const unchanged=await env.store.read(run.id);assert.equal(unchanged.status,'working');assert.equal(unchanged.tasks.length,1);assert.equal(unchanged.tasks[0].status,'working');assert.equal(env.checks(),0);
   assert.match(env.chat.messages.at(-1).projectTaskError,/PROJECT_BUSY/);
+});
+
+test('normal coding chat saves a single file per revision and keeps earlier downloads', async t => {
+  const env = await workspace(t, async () => ({passed:true,executed:true,behaviorVerified:true,checks:[]}), {persistent:false,singleFile:true});
+  assert.equal(env.coding.shouldRun('Can you code a greeting for me?'), true);
+  await env.coding.run('Can you code a greeting in Python for me?');
+  const first = env.chat.messages.at(-1);
+  assert.equal(first.content, 'The script prints hello. Behavior checks passed.');
+  assert.equal(first.codingArtifact.filename, 'main.py');
+  assert.equal(env.coding.shouldRun('Change the greeting', env.chat, true), true);
+  assert.equal(env.coding.shouldRun('Show me the code', env.chat, true), false);
+  await env.coding.run('Change the greeting');
+  const second = env.chat.messages.at(-1);
+  assert.equal(first.scratchRunId, second.scratchRunId);
+  assert.notEqual(first.codingArtifact.id, second.codingArtifact.id);
+  assert.equal((await env.store.list()).length, 0);
+  await env.store.cleanupExpiredScratch(Infinity);
+  for (const message of [first, second]) {
+    const container = element('div');
+    env.coding.render(container, message);
+    assert.deepEqual(container.children.map(child => child.tagName), ['p', 'div']);
+    assert.equal(container.children[0].textContent, message.content);
+    const download = container.children[1].children.at(-1);
+    assert.equal(download.textContent, 'Download');
+    await download.onclick();
+  }
+  assert.deepEqual(env.downloads.map(data => data.toString()), ['print("hello")\n', 'print("repaired")\n']);
+});
+
+test('normal coding chat saves multiple files as a ZIP when execution is unavailable', async t => {
+  const env = await workspace(t, async () => ({passed:false,executed:false,checks:[],reason:'Docker unavailable.'}), {persistent:false});
+  await env.coding.run('Build a Python project');
+  const message = env.chat.messages.at(-1), artifact = message.codingArtifact;
+  assert.match(message.content, /Code not run\. Docker unavailable\./);
+  assert.match(artifact.filename, /\.zip$/);
+  const {unzipSync} = require('fflate');
+  const zip = unzipSync(await env.store.readCodingArtifact(artifact.id, artifact.filename));
+  assert.deepEqual(Object.keys(zip).sort(), ['main.py', 'test_main.py']);
 });
