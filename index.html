@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="124x119" href="./icons/WebLogoICON.png" />
 <link rel="apple-touch-icon" sizes="496x496" href="./icons/AtlasChat Mobile.png" />
 </head>
-<body data-atlas-build="B23" data-atlas-runtime="v2" data-atlas-schema="v1">
+<body data-atlas-build="B24" data-atlas-runtime="v2" data-atlas-schema="v1">
 <div class="app" id="app">
   <aside class="rail">
     <button class="rail-button" id="railToggle" aria-label="Open sidebar" title="Chats">
@@ -284,7 +284,7 @@
     <p>Atlas saves your chats and memory on this device. Models run locally.</p>
     <details class="technical-details"><summary>Technical details</summary>
       <dl class="info-grid">
-        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B23</dd></div>
+        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B24</dd></div>
         <div class="info-row"><dt>Engine</dt><dd id="aboutEngine">Atlas 7.5 · WebLLM / MLC · WebGPU</dd></div>
         <div class="info-row"><dt>Context</dt><dd>4K tokens, with summaries of earlier turns. Your full transcript is saved.</dd></div>
         <div class="info-row"><dt>Storage</dt><dd>Schema v1 · chats and memory are saved independently of app updates.</dd></div>
@@ -437,7 +437,7 @@
 <script src="./atlas-files.js"></script>
 <script>
 (() => {
-  const BUILD = "Atlas-CHAT-B23";
+  const BUILD = "Atlas-CHAT-B24";
   const $ = q => document.querySelector(q);
 
   function initCustomTooltips(){
@@ -2701,8 +2701,11 @@
     return /\b(code|script|program|html|css|scss|sass|less|javascript|typescript|js|jsx|ts|tsx|python|pygame|java|shader|function|class|rust|ruby|php|swift|kotlin|dart|lua|sql|bash|shell|powershell|go|perl)\b|c\+\+|c#/i.test(source);
   }
 
-  function shouldWithholdGeneratedResponse(request,response="",codeContinuation=false){
-    return codeContinuation||isCodeRequest(request)||isFileRequest(request)||String(response||"").includes("```");
+  function pendingReplyPreview(text,request,codeContinuation=false){
+    const fence=text.indexOf("```");
+    if(fence>=0)return {text:text.slice(0,fence).trimEnd(),writingCode:true};
+    const waitsForFile=codeContinuation||isFileRequest(request);
+    return {text:waitsForFile?"":text,writingCode:waitsForFile&&Boolean(text.trim())};
   }
 
   function isPlanCandidate(text){
@@ -3051,7 +3054,6 @@
       else if(state.hasToken)paintPendingText();
     }else if(secondaryJob?.chatId===c.id&&secondaryJob.status!=="done"){
       secondaryJob.pendingEl=addMessageEl("assistant","",true);
-      const modelLabel=secondaryJob.pendingEl.shell.querySelector(".assistant-label");if(modelLabel)modelLabel.textContent=modelChoiceNames[secondaryJob.choice]||"Atlas 7.5 Mini";
       secondaryJob.pendingEl.status.textContent=secondaryJob.statusText||"Thinking";
       if(secondaryJob.pendingText)paintSecondaryJob(secondaryJob);
     }
@@ -3107,7 +3109,7 @@
     }else if(thinking){
       thinkingStatus=document.createElement("span");thinkingStatus.className="thinking-status";thinkingStatus.setAttribute("role","status");thinkingStatus.setAttribute("aria-live","polite");thinkingStatus.setAttribute("aria-atomic","true");thinkingStatus.textContent="Thinking";
       thinkingResponse=document.createElement("div");thinkingResponse.className="thinking-response";
-      content.append(thinkingStatus,thinkingResponse);
+      content.append(thinkingResponse,thinkingStatus);
     }else if(role==="assistant"){
       renderAssistantMarkdown(content,codeReply?visibleCodeResponse(text):text,fileReply,request,codeContinuation);
     }else{
@@ -3115,11 +3117,6 @@
       if(role==="user")appendMessageAttachments(content,message?.attachments);
     }
 
-    if(role==="assistant"){
-      const label=document.createElement("div");label.className="assistant-label";
-      label.textContent=message?.kind==="poem3-image"?(message.modelName||"Poem 3"):message?.modelName||modelChoiceNames[state.modelChoice]||"Atlas";
-      shell.appendChild(label);
-    }
     shell.appendChild(content);
 
     if(codeReply){
@@ -3701,7 +3698,7 @@ Local date/time: ${current}.${global}${local}`
     const latestUser=[...((chat?.messages)||[])].reverse().find(message=>message.role==="user");
     state.pendingRequest=String(latestUser?.content||"");
     state.pendingCodeContinuation=Boolean(latestUser?.codeContinuation);
-    state.pendingStatus=shouldWithholdGeneratedResponse(state.pendingRequest,"",state.pendingCodeContinuation)?"Writing code…":"Thinking";
+    state.pendingStatus="Thinking";
     state.hasToken=false;
     state.pendingText="";
     state.modelStatusCarry="";state.modelStatusUpdates=0;
@@ -3765,13 +3762,10 @@ Local date/time: ${current}.${global}${local}`
     if(!state.pendingEl?.content||state.pendingChatId!==state.activeChatId)return;
     const request=state.pendingRequest;
     const target=state.pendingEl.response||state.pendingEl.content;
-    if(shouldWithholdGeneratedResponse(request,state.pendingText,state.pendingCodeContinuation)){
-      setThinkingStatus("Writing code…");
-      target.replaceChildren();
-      return;
-    }
-    renderAssistantMarkdown(target,state.pendingText,false,request,state.pendingCodeContinuation);
-    target.insertAdjacentHTML("beforeend",'<span class="cursor"></span>');
+    const preview=pendingReplyPreview(state.pendingText,request,state.pendingCodeContinuation);
+    if(preview.writingCode)setThinkingStatus("Writing code…");
+    renderAssistantMarkdown(target,preview.text,false,request,state.pendingCodeContinuation);
+    if(preview.text&&!preview.writingCode)target.insertAdjacentHTML("beforeend",'<span class="cursor"></span>');
     scrollBottom();
   }
 
@@ -3823,12 +3817,9 @@ Local date/time: ${current}.${global}${local}`
   function paintSecondaryJob(job){
     if(!job?.pendingEl?.response)return;
     const visible=stripModelStatusMarkers(job.rawText||job.pendingText||"");
-    if(shouldWithholdGeneratedResponse(job.pendingRequest,job.rawText||job.pendingText,job.codeContinuation)){
-      if(job.pendingEl.status)job.pendingEl.status.textContent="Writing code…";
-      job.pendingEl.response.replaceChildren();
-      return;
-    }
-    renderAssistantMarkdown(job.pendingEl.response,visible,false,job.pendingRequest,job.codeContinuation);
+    const preview=pendingReplyPreview(visible,job.pendingRequest,job.codeContinuation);
+    if(preview.writingCode)job.pendingEl.status.textContent="Writing code…";
+    renderAssistantMarkdown(job.pendingEl.response,preview.text,false,job.pendingRequest,job.codeContinuation);
     scrollBottom();
   }
 
@@ -3880,7 +3871,7 @@ Local date/time: ${current}.${global}${local}`
       else showToast(`That reply in ${displayTitle(c)} needs a shorter request.`);
       renderHistory();updateModelControls();setReplyControls(false);flushDeferredTitles();restoreActiveChatModel();return;
     }
-    job.status="generating";job.statusText=codeTask?"Writing code…":"Thinking";job.pendingRequest=latest;job.codeContinuation=codeContinuation;job.codeContinuationLanguage=String(latestUser?.codeContinuationLanguage||"");job.pendingText="";job.rawText="";
+    job.status="generating";job.statusText="Thinking";job.pendingRequest=latest;job.codeContinuation=codeContinuation;job.codeContinuationLanguage=String(latestUser?.codeContinuationLanguage||"");job.pendingText="";job.rawText="";
     if(state.activeChatId===c.id){renderCurrent();setReplyControls(true);}
     renderHistory();
     const from=Math.min(c.summarizedThrough,c.messages.length);
@@ -4497,8 +4488,7 @@ Local date/time: ${current}.${global}${local}`
       const firstToken=!state.hasToken;
       if(firstToken){
         state.hasToken=true;
-        if(shouldWithholdGeneratedResponse(state.pendingRequest,state.pendingText,state.pendingCodeContinuation))setThinkingStatus("Writing code…");
-        else if(!state.modelStatusUpdates)setThinkingStatus("Writing the reply…");
+        if(!state.modelStatusUpdates)setThinkingStatus("Writing the reply…");
       }
 
       state.pendingText+=visible;
