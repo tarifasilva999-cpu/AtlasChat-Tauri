@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="124x119" href="./icons/WebLogoICON.png" />
 <link rel="apple-touch-icon" sizes="496x496" href="./icons/AtlasChat Mobile.png" />
 </head>
-<body data-atlas-build="B22" data-atlas-runtime="v2" data-atlas-schema="v1">
+<body data-atlas-build="B23" data-atlas-runtime="v2" data-atlas-schema="v1">
 <div class="app" id="app">
   <aside class="rail">
     <button class="rail-button" id="railToggle" aria-label="Open sidebar" title="Chats">
@@ -281,12 +281,10 @@
 <div class="scrim" id="infoModal" role="dialog" aria-modal="true" aria-label="About Atlas">
   <section class="panel">
     <div class="panel-head"><h2>About Atlas</h2><button class="panel-close" data-close="infoModal">×</button></div>
-    <img class="about-logo" src="./icons/Brand/Chat White.png" alt="" />
-    <h3 class="about-name">Atlas</h3><p class="about-tagline">A private space to think things through.</p>
-    <p>Your chats and saved memory live in this browser. Replies are generated on your device. Atlas can make mistakes, so check details that matter.</p>
+    <p>Atlas saves your chats and memory on this device. Models run locally.</p>
     <details class="technical-details"><summary>Technical details</summary>
       <dl class="info-grid">
-        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B22</dd></div>
+        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B23</dd></div>
         <div class="info-row"><dt>Engine</dt><dd id="aboutEngine">Atlas 7.5 · WebLLM / MLC · WebGPU</dd></div>
         <div class="info-row"><dt>Context</dt><dd>4K tokens, with summaries of earlier turns. Your full transcript is saved.</dd></div>
         <div class="info-row"><dt>Storage</dt><dd>Schema v1 · chats and memory are saved independently of app updates.</dd></div>
@@ -295,51 +293,106 @@
   </section>
 </div>
 
-<div class="scrim" id="settingsModal" role="dialog" aria-modal="true" aria-label="Settings">
+<div class="scrim" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
   <section class="panel settings-panel">
-    <div class="panel-head settings-panel-head"><div><h2>Settings</h2></div><button class="panel-close" data-close="settingsModal" aria-label="Close settings">×</button></div>
-    <div class="settings-layout">
-      <nav class="settings-nav" role="tablist" aria-label="Settings categories" aria-orientation="vertical">
-        <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPaneAppearance" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.5 2-2 .9-1.8-.6-2 3.4 1.4 1.4v2.3L3.2 14l2 3.4 1.8-.6 2 .9.5 2h4l.5-2 2-.9 1.8.6 2-3.4-1.4-1.6v-2.3l1.4-1.4-2-3.4-1.8.6-2-.9-.5-2z"/><circle cx="11.5" cy="11.5" r="3"/></svg><span>General</span></button>
-        <button class="settings-tab" id="settingsTabModel" type="button" role="tab" aria-controls="settingsPaneModel" aria-selected="false" tabindex="-1"><img class="settings-model-icon" src="./icons/Brand/AtlasCode White.png" alt="" /><span>Model</span></button>
-        <button class="settings-tab" id="settingsTabProjects" type="button" role="tab" aria-controls="settingsPaneProjects" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.75 8.25V6.9c0-.91.74-1.65 1.65-1.65h4.45l2.1 2.1h6.65c.91 0 1.65.74 1.65 1.65v8.1c0 .91-.74 1.65-1.65 1.65H5.4c-.91 0-1.65-.74-1.65-1.65V8.25Z"/><path d="M4 9.25h16"/></svg><span>Projects</span></button>
-        <button class="settings-tab" id="settingsTabAtlas" type="button" role="tab" aria-controls="settingsPaneAtlas" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.25"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 5v4m-2-2h4"/></svg><span>You</span></button>
-      </nav>
-      <div class="settings-content">
-        <section class="settings-pane" id="settingsPaneAppearance" role="tabpanel" aria-labelledby="settingsTabAppearance">
-          <header class="settings-pane-heading"><span class="settings-pane-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></span><div class="settings-pane-copy"><h3>Appearance</h3><p>Set the look and motion of Atlas.</p></div></header>
-          <div class="settings-control-list settings-font-list">
-            <div class="settings-control-row"><label class="settings-control-title" for="settingsUiFont">Interface font</label><span class="settings-choice"><select id="settingsUiFont"><option value="atlas-text">Atlas Text</option><option value="atlas-sans" selected>Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></span></div>
-            <div class="settings-control-row"><label class="settings-control-title" for="settingsChatFont">Response font</label><span class="settings-choice"><select id="settingsChatFont"><option value="atlas-text" selected>Atlas Text</option><option value="atlas-sans">Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select></span></div>
-            <div class="settings-control-row"><label class="settings-control-title" for="settingsTextSize">Script text size</label><span class="settings-choice"><select id="settingsTextSize"><option value="small">Small</option><option value="medium" selected>Medium (Default)</option><option value="large">Large</option></select></span></div>
-            <div class="settings-control-row"><label class="settings-control-title" for="themeBtn">Visual mode</label><span class="settings-choice"><select id="themeBtn"><option value="dark">Dark</option><option value="light">Light</option></select></span></div>
-            <div class="settings-control-row"><label class="settings-control-title" for="reduceMotionBtn">Motion</label><span class="settings-choice"><select id="reduceMotionBtn"><option value="normal">Normal</option><option value="reduced">Reduced</option></select></span></div>
+    <header class="settings-panel-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button class="panel-close" data-close="settingsModal" type="button" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header>
+    <nav class="settings-nav" role="tablist" aria-label="Settings categories" aria-orientation="vertical">
+      <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPaneAppearance" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19m0-14-1.5 1.5m-11 11L5 19"/></svg><span>Appearance</span></button>
+      <button class="settings-tab" id="settingsTabModel" type="button" role="tab" aria-controls="settingsPaneModel" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5M12 12v9"/></svg><span>Models</span></button>
+      <button class="settings-tab" id="settingsTabProjects" type="button" role="tab" aria-controls="settingsPaneProjects" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a1 1 0 0 1 1-1h5l2 2h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8Zm0 2h16"/></svg><span>Projects</span></button>
+      <button class="settings-tab" id="settingsTabAtlas" type="button" role="tab" aria-controls="settingsPaneAtlas" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M4 10h16M8 7h.01m3 0h.01"/></svg><span>App</span></button>
+    </nav>
+    <div class="settings-content">
+      <section class="settings-pane" id="settingsPaneAppearance" role="tabpanel" aria-labelledby="settingsTabAppearance" tabindex="0">
+        <h3 class="settings-pane-title">Appearance</h3>
+        <fieldset class="settings-group" id="settingsTheme">
+          <legend>Theme</legend>
+          <div class="settings-themes">
+            <label class="settings-theme">
+              <input type="radio" name="atlas-theme" value="dark" checked />
+              <span class="settings-theme-preview settings-theme-preview-dark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+              <span class="settings-theme-caption">Dark <span class="settings-radio-mark" aria-hidden="true"></span></span>
+            </label>
+            <label class="settings-theme">
+              <input type="radio" name="atlas-theme" value="light" />
+              <span class="settings-theme-preview settings-theme-preview-light" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+              <span class="settings-theme-caption">Light <span class="settings-radio-mark" aria-hidden="true"></span></span>
+            </label>
           </div>
+        </fieldset>
+        <section class="settings-group" aria-labelledby="settingsTypeTitle">
+          <h4 id="settingsTypeTitle">Typography</h4>
+          <div class="settings-fonts">
+            <div class="settings-font">
+              <label for="settingsUiFont">Interface font</label>
+              <select id="settingsUiFont"><option value="atlas-text">Atlas Text</option><option value="atlas-sans" selected>Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select>
+            </div>
+            <div class="settings-font">
+              <label for="settingsChatFont">Response font</label>
+              <select id="settingsChatFont"><option value="atlas-text" selected>Atlas Text</option><option value="atlas-sans">Atlas Sans</option><option value="atlas-serif">Atlas Serif</option></select>
+            </div>
+          </div>
+          <fieldset class="settings-text-size" id="settingsTextSize">
+            <legend>Chat and code size</legend>
+            <div class="settings-segments">
+              <label><input type="radio" name="atlas-text-size" value="small" /><span>Small</span></label>
+              <label><input type="radio" name="atlas-text-size" value="medium" checked /><span>Medium</span></label>
+              <label><input type="radio" name="atlas-text-size" value="large" /><span>Large</span></label>
+            </div>
+          </fieldset>
         </section>
-        <section class="settings-pane" id="settingsPaneModel" role="tabpanel" aria-labelledby="settingsTabModel" hidden>
-          <header class="settings-pane-heading"><span class="settings-pane-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 8.5 4.5v9L12 21l-8.5-4.5v-9L12 3Z"/><path d="m3.8 7.5 8.2 4.4 8.2-4.4M12 12v9"/></svg></span><div class="settings-pane-copy"><h3>Model</h3><p>Choose a model and see what is running.</p></div></header>
-          <dl class="info-grid settings-model-grid"><div class="info-row"><dt>Selected</dt><dd id="activeModelName">Loading…</dd></div><div class="info-row"><dt>Running on</dt><dd id="activeRuntimeName">Getting ready…</dd></div></dl>
+        <label class="settings-motion">
+          <span>Reduce motion</span>
+          <input type="checkbox" id="reduceMotionBtn" role="switch" />
+          <span class="settings-switch" aria-hidden="true"></span>
+        </label>
+      </section>
+      <section class="settings-pane" id="settingsPaneModel" role="tabpanel" aria-labelledby="settingsTabModel" tabindex="0" hidden>
+        <h3 class="settings-pane-title">Models</h3>
+        <div class="settings-card settings-model-card">
+          <div class="settings-model-overview">
+            <dl class="settings-model-grid">
+              <div><dt>Selected model</dt><dd id="activeModelName">Loading…</dd></div>
+              <div><dt>Running on</dt><dd id="activeRuntimeName">Getting ready…</dd></div>
+            </dl>
+            <button class="settings-primary" id="settingsChooseModelBtn" type="button">Choose a model <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          </div>
           <p class="model-status" id="modelStatus" role="status"></p>
-          <details class="technical-details" id="fallbackDetails" hidden><summary>Why did Atlas switch?</summary><p id="fallbackReason"></p></details>
-          <button class="settings-model-action" id="settingsChooseModelBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="19" r="2"/></svg><span>Choose a model</span><span aria-hidden="true">↗</span></button>
-        </section>
-        <section class="settings-pane settings-projects-pane" id="settingsPaneProjects" role="tabpanel" aria-labelledby="settingsTabProjects" hidden>
-          <header class="settings-pane-heading"><span class="settings-pane-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.75 8.25V6.9c0-.91.74-1.65 1.65-1.65h4.45l2.1 2.1h6.65c.91 0 1.65.74 1.65 1.65v8.1c0 .91-.74 1.65-1.65 1.65H5.4c-.91 0-1.65-.74-1.65-1.65V8.25Z"/><path d="M4 9.25h16"/></svg></span><div class="settings-pane-copy"><h3>Projects</h3><p>Build and manage your project workspaces.</p></div></header>
-          <div class="settings-projects-desktop-note" id="settingsProjectsDesktopNotice"><span class="settings-projects-note-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6m-3-4v4"/></svg></span><div><strong>Projects run in Atlas Desktop</strong><p>Open the desktop app to create projects, import ZIPs, and use coding tools.</p></div></div>
-          <div id="settingsProjectContent"></div>
-        </section>
-        <section class="settings-pane" id="settingsPaneAtlas" role="tabpanel" aria-labelledby="settingsTabAtlas" hidden>
-          <header class="settings-pane-heading"><span class="settings-pane-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.25"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 5v4m-2-2h4"/></svg></span><div class="settings-pane-copy"><h3>Your Atlas</h3><p>Personal details, app data, and information.</p></div></header>
-          <div class="settings-actions settings-action-grid">
-            <button class="side-action settings-action" id="memoryBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6.75h10A2.25 2.25 0 0 1 19.25 9v6A2.25 2.25 0 0 1 17 17.25H9.5L5.75 20v-11A2.25 2.25 0 0 1 8 6.75"/></svg></span><span class="settings-action-label">Memory</span></button>
-            <button class="side-action settings-action" id="installBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 18.5h14"/></svg></span><span class="settings-action-label">Install Atlas</span><span class="install-badge" id="installedBadge">Installed</span></button>
-            <button class="side-action settings-action" id="dataBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m8 8 4-4 4 4"/><path d="M5 19.5h14"/></svg></span><span class="settings-action-label">Data</span></button>
-            <button class="side-action settings-action" id="infoBtn" type="button"><span class="settings-action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"/><path d="M12 10.75v5M12 8.05h.01"/></svg></span><span class="settings-action-label">About</span></button>
+        </div>
+        <details class="technical-details" id="fallbackDetails" hidden><summary>Why did Atlas switch?</summary><p id="fallbackReason"></p></details>
+      </section>
+      <section class="settings-pane" id="settingsPaneProjects" role="tabpanel" aria-labelledby="settingsTabProjects" tabindex="0" hidden>
+        <h3 class="settings-pane-title">Projects</h3>
+        <div class="settings-card settings-projects-desktop-note" id="settingsProjectsDesktopNotice">
+          <span class="settings-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M9 21h6m-3-3.5V21m-3-11-2 2 2 2m6-4 2 2-2 2"/></svg></span>
+          <div><h4>Available in Atlas Desktop</h4><p>Create workspaces, import ZIPs, and use coding tools.</p></div>
+        </div>
+        <div id="settingsProjectContent"></div>
+      </section>
+      <section class="settings-pane" id="settingsPaneAtlas" role="tabpanel" aria-labelledby="settingsTabAtlas" tabindex="0" hidden>
+        <h3 class="settings-pane-title">App</h3>
+        <section class="settings-group" aria-labelledby="settingsDataTitle">
+          <h4 id="settingsDataTitle">Personal data</h4>
+          <div class="settings-action-grid">
+            <button class="settings-card settings-action" id="memoryBtn" type="button"><span class="settings-feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12a2 2 0 0 1 2 2v12l-4-3H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 4h8m-8 3.5h5"/></svg></span><strong>Memory</strong><span class="settings-chevron" aria-hidden="true"></span></button>
+            <button class="settings-card settings-action" id="dataBtn" type="button"><span class="settings-feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16m-1 0v10H5V9M3 5h18v4H3zm7 8h4"/></svg></span><strong>Backups</strong><span class="settings-chevron" aria-hidden="true"></span></button>
           </div>
-          <div class="settings-update-row"><button id="settingsCheckUpdates" type="button">Check for updates</button><span id="settingsUpdateStatus" role="status"></span></div>
-          <dl class="info-grid settings-version"><div class="info-row"><dt>UI version</dt><dd>OriginUI 3</dd></div></dl>
         </section>
-      </div>
+        <section class="settings-group" aria-labelledby="settingsAppTitle">
+          <h4 id="settingsAppTitle">AtlasChat</h4>
+          <div class="settings-action-grid">
+            <button class="settings-card settings-action" id="installBtn" type="button"><span class="settings-feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4-4 4 4 4-4M5 17v3h14v-3"/></svg></span><strong>Install Atlas <span class="install-badge" id="installedBadge">Installed</span></strong><span class="settings-chevron" aria-hidden="true"></span></button>
+            <button class="settings-card settings-action" id="infoBtn" type="button"><span class="settings-feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"/><path d="M12 11v5m0-8h.01"/></svg></span><strong>About Atlas</strong><span class="settings-chevron" aria-hidden="true"></span></button>
+          </div>
+          <div class="settings-update-row">
+            <div><span class="settings-version">OriginUI 4</span><small id="settingsUpdateStatus" role="status"></small></div>
+            <button class="settings-secondary" id="settingsCheckUpdates" type="button">Check for updates</button>
+          </div>
+        </section>
+      </section>
     </div>
   </section>
 </div>
@@ -348,16 +401,15 @@
   <section class="panel">
     <div class="panel-head"><h2>Install Atlas</h2><button class="panel-close" data-close="installModal">×</button></div>
     <div class="install-copy" id="installCopy">
-      <strong>Atlas can live on your home screen like an app.</strong><br><br>
-      Open Atlas from your home screen or desktop. Your browser may offer an Install button, or an Add to Home Screen option in its menu.
+      Look for <strong>Install app</strong> or <strong>Add to Home Screen</strong> in your browser menu.
     </div>
     <div class="panel-foot"><button class="text-btn" id="installAction">Install</button></div>
   </section>
 </div>
 
-<div class="scrim" id="dataModal" role="dialog" aria-modal="true" aria-label="Atlas data">
+<div class="scrim" id="dataModal" role="dialog" aria-modal="true" aria-label="Backups">
   <section class="panel">
-    <div class="panel-head"><h2>Atlas data</h2><button class="panel-close" data-close="dataModal">×</button></div>
+    <div class="panel-head"><h2>Backups</h2><button class="panel-close" data-close="dataModal">×</button></div>
     <div class="data-actions">
       <button class="data-button" id="exportData">
         <strong>Save a backup</strong>
@@ -385,7 +437,7 @@
 <script src="./atlas-files.js"></script>
 <script>
 (() => {
-  const BUILD = "Atlas-CHAT-B22";
+  const BUILD = "Atlas-CHAT-B23";
   const $ = q => document.querySelector(q);
 
   function initCustomTooltips(){
@@ -480,6 +532,7 @@
   const installModal = $("#installModal");
   const dataModal = $("#dataModal");
   const installBtn = $("#installBtn");
+  installBtn.hidden=Boolean(window.atlasDesktop);
   const installAction = $("#installAction");
   const installedBadge = $("#installedBadge");
   const installCopy = $("#installCopy");
@@ -875,6 +928,7 @@
     const scale={small:.9,medium:1,large:1.125}[state.textSize];
     document.documentElement.style.setProperty("--chat-text-size",`${16*scale}px`);
     document.documentElement.style.setProperty("--code-text-size",`${13*scale}px`);
+    $(`#settingsTextSize input[value="${state.textSize}"]`).checked=true;
   }
   applyFontPreferences();
   document.documentElement.dataset.reduceMotion=String(state.reduceMotion);
@@ -947,11 +1001,12 @@
   }
 
   function setTheme(theme){
+    theme=theme==="light"?"light":"dark";
     document.documentElement.dataset.theme=theme;
     state.theme=theme;
     document.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute("content",theme==="dark"?"#202020":"#F7F6F3");
     $("#headerTheme").setAttribute("aria-label",theme==="dark"?"Switch to light appearance":"Switch to dark appearance");
-    $("#themeBtn").value=theme;
+    $(`#settingsTheme input[value="${theme}"]`).checked=true;
     persistSettings();
     $("#themeIcon").innerHTML=theme==="dark"
       ? '<path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/>'
@@ -1808,7 +1863,7 @@
         : "<strong>Install from your browser</strong><br><br>Look for <b>Install app</b> or <b>Add to Home Screen</b> in the browser menu. On a computer, you may also see an install icon in the address bar.";
     installAction.textContent="Got it";
     installAction.disabled=false;
-    installAction.onclick=()=>installModal.classList.remove("show");
+    installAction.onclick=()=>closePanel(installModal);
   }
 
   async function updateStorageStatus(){
@@ -4684,19 +4739,31 @@ Local date/time: ${current}.${global}${local}`
   $("#mobileNewChat").onclick=()=>newChat();
 
   let panelReturnFocus=null;
+  let settingsReturn=null;
   function closePanel(panel){
     panel.classList.remove("show");
+    if(settingsReturn&&panel!==settingsModal){
+      settingsModal.classList.add("show");
+      const {opener,control}=settingsReturn;
+      settingsReturn=null;
+      panelReturnFocus=opener;
+      if(settingsModal.contains(control))control.focus({preventScroll:true});
+      else settingsModal.querySelector(".panel-close").focus();
+      return;
+    }
     if(panelReturnFocus instanceof HTMLElement){
-      if(panel!==settingsModal&&panelReturnFocus.id==="settingsBtn"){
-        settingsModal.classList.add("show");settingsModal.querySelector(".panel-close").focus();
-        panelReturnFocus=$("#railToggle");
-      }else if(isMobileUI()&&panelReturnFocus.closest(".sidebar"))$("#railToggle").focus();
+      if(isMobileUI()&&panelReturnFocus.closest(".sidebar"))$("#railToggle").focus();
       else panelReturnFocus.focus({preventScroll:true});
     }
   }
   function openPanel(panel){
     const previousPanel=document.querySelector(".scrim.show");
-    panelReturnFocus=previousPanel?$("#settingsBtn"):document.activeElement;
+    if(previousPanel===settingsModal&&panel!==settingsModal){
+      settingsReturn={opener:panelReturnFocus,control:document.activeElement};
+    }else if(!previousPanel||panel===settingsModal){
+      settingsReturn=null;
+      panelReturnFocus=document.activeElement;
+    }
     document.querySelectorAll(".scrim.show").forEach(open=>open.classList.remove("show"));
     closeSidebarIfMobile();
 
@@ -5168,10 +5235,12 @@ Local date/time: ${current}.${global}${local}`
 
   const settingsTabs=Array.from(settingsModal.querySelectorAll('[role="tab"]'));
   const settingsTablist=settingsModal.querySelector('[role="tablist"]');
-  const settingsTabViewport=window.matchMedia("(max-width:620px)");
+  const settingsTabViewport=window.matchMedia("(max-width:760px)");
   function syncSettingsTabOrientation(){settingsTablist.setAttribute("aria-orientation",settingsTabViewport.matches?"horizontal":"vertical");}
   function activateSettingsTab(tab,focus=false){
+    const changed=tab.getAttribute("aria-selected")!=="true";
     settingsTabs.forEach(item=>{const selected=item===tab;item.setAttribute("aria-selected",String(selected));item.tabIndex=selected?0:-1;settingsModal.querySelector(`#${item.getAttribute("aria-controls")}`).hidden=!selected;});
+    if(changed)settingsModal.querySelector(".settings-content").scrollTop=0;
     if(focus)tab.focus();
   }
   settingsTabs.forEach((tab,index)=>{
@@ -5194,10 +5263,7 @@ Local date/time: ${current}.${global}${local}`
   $("#infoBtn").onclick=()=>openPanel(infoModal);
   updateModelControls();
 
-  $("#themeBtn").onchange=()=>{
-    setTheme($("#themeBtn").value);
-    closeSidebarIfMobile();
-  };
+  $("#settingsTheme").addEventListener("change",event=>setTheme(event.target.value));
   function bindFontSelect(selectId,stateKey,defaultChoice){
     const select=$(selectId);
     for(const option of select.options)option.style.fontFamily=FONT_FAMILY_STACKS[option.value];
@@ -5212,16 +5278,18 @@ Local date/time: ${current}.${global}${local}`
   }
   bindFontSelect("#settingsChatFont","chatFont","atlas-text");
   bindFontSelect("#settingsUiFont","uiFont","atlas-sans");
-  $("#settingsTextSize").value=state.textSize;
-  $("#settingsTextSize").onchange=()=>{state.textSize=$("#settingsTextSize").value;applyFontPreferences();persistSettings();};
+  $("#settingsTextSize").addEventListener("change",event=>{
+    state.textSize=event.target.value;
+    applyFontPreferences();
+    persistSettings();
+  });
   const reduceMotionBtn=$("#reduceMotionBtn");
-  const updateReduceMotionButton=()=>{reduceMotionBtn.value=state.reduceMotion?"reduced":"normal";};
-  updateReduceMotionButton();
+  reduceMotionBtn.checked=state.reduceMotion;
   reduceMotionBtn.onchange=()=>{
-    state.reduceMotion=reduceMotionBtn.value==="reduced";
+    state.reduceMotion=reduceMotionBtn.checked;
     document.documentElement.dataset.reduceMotion=String(state.reduceMotion);
     if(state.reduceMotion){$("#intelligenceSliderWrap").classList.remove("context-pulse");$(".composer-dock").classList.remove("context-pulse");}
-    updateReduceMotionButton();persistSettings();
+    persistSettings();
   };
 
   installBtn.onclick=()=>{
@@ -5251,7 +5319,7 @@ Local date/time: ${current}.${global}${local}`
     if(!file) return;
     try{
       await importBackupFile(file);
-      dataModal.classList.remove("show");
+      closePanel(dataModal);
     }catch(error){
       alert(error?.message || String(error));
     }finally{
@@ -5272,13 +5340,14 @@ Local date/time: ${current}.${global}${local}`
     saveMemories();
   };
 
-  document.querySelectorAll("[data-close]").forEach(b=>{b.setAttribute("aria-label","Close dialog");b.onclick=()=>closePanel($("#"+b.dataset.close));});
+  document.querySelectorAll("[data-close]").forEach(b=>{if(!b.hasAttribute("aria-label"))b.setAttribute("aria-label","Close dialog");b.onclick=()=>closePanel($("#"+b.dataset.close));});
   [memoryModal,infoModal,installModal,dataModal,settingsModal].forEach(m=>m.onclick=e=>{if(e.target===m)closePanel(m)});
   document.addEventListener("keydown",event=>{
     const panel=document.querySelector(".scrim.show");if(!panel)return;
     if(event.key==="Escape"){event.preventDefault();closePanel(panel);return;}
     if(event.key!=="Tab")return;
-    const controls=[...panel.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex="0"]')].filter(el=>el.getClientRects().length);
+    const controls=[...panel.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex="0"]')]
+      .filter(el=>el.tabIndex>=0&&el.getClientRects().length&&(el.type!=="radio"||el.checked));
     const first=controls[0],last=controls[controls.length-1];if(!first)return;
     if(event.shiftKey&&(document.activeElement===first||!panel.contains(document.activeElement))){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&(document.activeElement===last||!panel.contains(document.activeElement))){event.preventDefault();first.focus();}
