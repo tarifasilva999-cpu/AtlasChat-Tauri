@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="124x119" href="./icons/WebLogoICON.png" />
 <link rel="apple-touch-icon" sizes="496x496" href="./icons/AtlasChat Mobile.png" />
 </head>
-<body data-atlas-build="B21" data-atlas-runtime="v2" data-atlas-schema="v1">
+<body data-atlas-build="B22" data-atlas-runtime="v2" data-atlas-schema="v1">
 <div class="startup-splash" id="startupSplash" role="status" aria-label="Starting AtlasChat">
   <div class="startup-splash-inner"><img src="./icons/Brand/Chat White.png" alt=""><strong>AtlasChat</strong><span>Starting your workspace</span><div class="startup-splash-progress"></div></div>
 </div>
@@ -294,7 +294,7 @@
     <p>Your chats and saved memory live in this browser. Replies are generated on your device. Atlas can make mistakes, so check details that matter.</p>
     <details class="technical-details"><summary>Technical details</summary>
       <dl class="info-grid">
-        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B21</dd></div>
+        <div class="info-row"><dt>Version</dt><dd>Atlas · CHAT-B22</dd></div>
         <div class="info-row"><dt>Engine</dt><dd id="aboutEngine">Atlas 7.5 · WebLLM / MLC · WebGPU</dd></div>
         <div class="info-row"><dt>Context</dt><dd>4K tokens, with summaries of earlier turns. Your full transcript is saved.</dd></div>
         <div class="info-row"><dt>Storage</dt><dd>Schema v1 · chats and memory are saved independently of app updates.</dd></div>
@@ -3085,6 +3085,8 @@
     return row;
   }
 
+  const arrivingUserMessages=new WeakSet();
+
   function addMessageEl(role,text="",thinking=false,message=null,request=""){
     const root=document.createElement("div");
     root.className="message "+role;
@@ -3092,6 +3094,7 @@
 
     const shell=document.createElement("div");
     shell.className="message-shell";
+    if(arrivingUserMessages.has(message))shell.classList.add("is-arriving");
 
     const content=document.createElement("div");
     content.className="message-text";
@@ -3211,6 +3214,11 @@
     const message={id:uid(),role,content,ts:Date.now(),...metadata};
     if(role==="assistant"&&!message.modelName)message.modelName=state.poem3Mode?"Image 1.1":(modelChoiceNames[state.modelChoice]||"Atlas 7.5 Mini");
     c.messages.push(message);
+    if(role==="user"&&c.id===state.activeChatId){
+      arrivingUserMessages.add(message);
+      // Keep the entry animation through synchronous redraws for instant replies.
+      queueMicrotask(()=>arrivingUserMessages.delete(message));
+    }
     c.updated=Date.now();
     persist();renderHistory();
     return message;

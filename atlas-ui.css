@@ -1,4 +1,4 @@
-/* Atlas B21: all presentation lives in this stylesheet. */
+/* Atlas B22: all presentation lives in this stylesheet. */
 .desktop-app-actions{display:none!important}
 html.desktop-app .desktop-app-actions{display:grid!important}
 .desktop-window-mark,.desktop-window-controls{display:none}
@@ -261,9 +261,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke
 .model-picker-trigger[data-effort-level="3"]{--effort-glimmer:color-mix(in srgb,var(--text) 32%,transparent)}
 @keyframes apex-mark-settle{0%{transform:scale(.94);filter:brightness(.84)}38%{transform:scale(1.06);filter:brightness(1.12) drop-shadow(0 0 4px color-mix(in srgb,var(--text) 24%,transparent))}100%{transform:scale(1);filter:none}}
 @keyframes apex-effort-glimmer{0%,100%{text-shadow:0 0 0 transparent}38%{text-shadow:0 0 7px var(--effort-glimmer,transparent)}}
-.model-picker{position:fixed!important;z-index:140;left:50%!important;right:auto!important;bottom:calc(var(--composer-height) + 12px)!important;box-sizing:border-box;width:min(404px,calc(100vw - 32px))!important;max-height:min(510px,62dvh)!important;overflow:hidden;padding:10px 12px 11px!important;transform:translateX(-50%);border:1px solid var(--line)!important;border-radius:14px!important;background:var(--surface)!important;box-shadow:0 12px 34px #0003!important;transform-origin:50% 100%;animation:model-picker-arrive .18s cubic-bezier(.2,.8,.2,1) both}
+.model-picker{position:fixed!important;z-index:140;left:50%!important;right:auto!important;bottom:calc(var(--composer-height) + 12px)!important;box-sizing:border-box;width:min(404px,calc(100vw - 32px))!important;max-height:min(510px,62dvh)!important;overflow:hidden;padding:10px 12px 11px!important;transform:translateX(-50%);border:1px solid var(--line)!important;border-radius:14px!important;background:var(--surface)!important;box-shadow:0 12px 34px #0003!important;transform-origin:50% 100%}
 .model-picker[hidden]{display:none!important}
-@keyframes model-picker-arrive{from{opacity:0;transform:translate(-50%,7px) scale(.985)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
 .model-picker-head{display:flex!important;align-items:center;justify-content:space-between;gap:12px;min-height:31px;padding:0 0 7px!important;border-bottom:1px solid var(--line)}
 .model-picker-head strong{font-size:13px!important;font-weight:550!important;letter-spacing:.005em}
 .model-picker-head button{display:grid!important;place-items:center;width:26px!important;height:26px!important;padding:0;border:0!important;border-radius:7px!important;background:transparent;color:var(--muted);font-size:19px!important;line-height:1;transition:background .14s,color .14s}
@@ -525,7 +524,7 @@ html[data-theme="light"]{--error-surface:#f2e2df}
 .effort-picker-trigger{gap:3px;padding-left:10px;border-left:1px solid var(--line);color:var(--muted);font-size:12px}
 .intelligence-trigger,.intelligence-popover,.fast-mode-toggle,.model-picker-head,.attachment-info-wrap{display:none!important}
 .effort-picker[hidden],.effort-picker-trigger[hidden],.model-picker .model-option[hidden]{display:none!important}
-.model-picker{position:fixed!important;z-index:160;left:calc((100vw - min(720px,100vw))/2 + 18px)!important;right:auto!important;bottom:calc(var(--composer-height) - 24px)!important;box-sizing:border-box;width:min(224px,calc(100vw - 24px))!important;max-height:min(360px,60dvh)!important;overflow:auto;padding:7px!important;transform:none!important;animation:none!important;border:1px solid var(--line-2)!important;border-radius:15px!important;background:var(--surface)!important;box-shadow:0 12px 36px #0004!important}
+.model-picker{position:fixed!important;z-index:160;left:calc((100vw - min(720px,100vw))/2 + 18px)!important;right:auto!important;bottom:calc(var(--composer-height) - 24px)!important;box-sizing:border-box;width:min(224px,calc(100vw - 24px))!important;max-height:min(360px,60dvh)!important;overflow:auto;padding:7px!important;transform:none!important;border:1px solid var(--line-2)!important;border-radius:15px!important;background:var(--surface)!important;box-shadow:0 12px 36px #0004!important}
 .model-picker-body{display:block!important}
 .model-picker .model-simple-list{display:grid;gap:0}
 .model-picker .model-option{display:flex!important;align-items:center;justify-content:flex-start!important;min-height:30px!important;padding:5px 9px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--text-2);font-size:13px;font-weight:450;text-align:left}
@@ -975,3 +974,64 @@ html[data-theme="light"] :is(.home-icon,.about-logo,.mobile-app-icon,.settings-m
  .update-banner{right:16px;bottom:max(16px,env(safe-area-inset-bottom));padding:18px}
 }
 @media(max-width:420px){.code-head{gap:6px;padding-inline:9px}.code-actions{gap:0}.code-copy{width:40px;min-width:40px;padding:0}.code-copy span{display:none}}
+
+/* Motion stays on the surface being shown or pressed. */
+@keyframes atlas-spring-in{
+  from{opacity:0;translate:0 var(--atlas-entry-offset,6px);scale:var(--atlas-entry-scale,.965)}
+  40%{opacity:1}
+  65%{translate:0 calc(var(--atlas-entry-offset,6px) * -.16);scale:var(--atlas-entry-peak,1.012)}
+  to{opacity:1;translate:none;scale:none}
+}
+@keyframes atlas-scrim-in{
+  from{opacity:0}
+  to{opacity:1}
+}
+@media(prefers-reduced-motion:no-preference){
+  :root:not([data-reduce-motion="true"]){
+    --atlas-motion-ease:cubic-bezier(.2,.72,.25,1);
+    --atlas-motion-release:cubic-bezier(.2,.75,.3,1.2);
+  }
+  :root:not([data-reduce-motion="true"]) .scrim.show{
+    animation:atlas-scrim-in 150ms ease-out;
+  }
+  :root:not([data-reduce-motion="true"]) .scrim.show > .panel{
+    animation:atlas-spring-in 280ms var(--atlas-motion-ease);
+  }
+  :root:not([data-reduce-motion="true"]) :is(.model-picker,.effort-picker,.intelligence-popover,.attachment-info-popover,.atlas-actions-menu):not([hidden]),
+  :root:not([data-reduce-motion="true"]) .update-banner.show{
+    --atlas-entry-offset:5px;
+    --atlas-entry-scale:.975;
+    --atlas-entry-peak:1.008;
+    transform-origin:center bottom;
+    animation:atlas-spring-in 230ms var(--atlas-motion-ease);
+  }
+  :root:not([data-reduce-motion="true"]) .atlas-actions-menu{
+    --atlas-entry-offset:-5px;
+    transform-origin:top right;
+  }
+  :root:not([data-reduce-motion="true"]) .intelligence-popover{
+    /* Placement measures the popover while it opens. */
+    --atlas-entry-scale:1;
+    --atlas-entry-peak:1;
+  }
+  :root:not([data-reduce-motion="true"]) .message-shell.is-arriving{
+    --atlas-entry-offset:5px;
+    --atlas-entry-peak:1.005;
+    transform-origin:bottom right;
+    animation:atlas-spring-in 235ms var(--atlas-motion-ease);
+  }
+  :root:not([data-reduce-motion="true"]) .sidebar{
+    transition-duration:240ms;
+    transition-timing-function:var(--atlas-motion-ease);
+  }
+  :root:not([data-reduce-motion="true"]) :is(.toast,.mini-toast){
+    transition:opacity 160ms ease-out,transform 230ms var(--atlas-motion-release);
+  }
+  :root:not([data-reduce-motion="true"]) :is(.send,.rail-button,.sidebar-close,.sidebar-tool,.mobile-new,.panel-close,.attachment-add,.model-picker-trigger,.effort-picker-trigger,.intelligence-trigger){
+    transition:background-color 140ms ease,color 140ms ease,opacity 140ms ease,scale 190ms var(--atlas-motion-release);
+  }
+  :root:not([data-reduce-motion="true"]) :is(.send,.rail-button,.sidebar-close,.sidebar-tool,.mobile-new,.panel-close,.attachment-add,.model-picker-trigger,.effort-picker-trigger,.intelligence-trigger):active:not(:disabled){
+    scale:.94;
+    transition:background-color 100ms ease,color 100ms ease,opacity 100ms ease,scale 80ms ease-out;
+  }
+}
