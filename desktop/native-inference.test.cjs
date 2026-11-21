@@ -107,15 +107,24 @@ test('Stop interrupts an in-flight request, while a stale request cannot stop a 
 });
 test('native requests are authenticated on loopback and stream real tokens within the requested budget', async () => {
   const events = [];
+  let expectedFormat;
   const runner = fakeRunner(async (url, init) => {
     assert.equal(url, 'http://127.0.0.1:12345/v1/chat/completions');
     assert.equal(init.headers.Authorization, 'Bearer test-secret');
     const body = JSON.parse(init.body); assert.equal(body.max_tokens, 6000); assert.equal(body.stream, true);
+    assert.equal(body.response_format?.type, expectedFormat?.type);
+    assert.deepEqual(body.response_format?.schema?.required, expectedFormat?.required);
     return new Response('data: {"choices":[{"delta":{"content":"Ready"}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
   }, events);
   const result = await runner.complete({ id: 'reply:live', lease: 'test-lease', max_tokens: 6000, messages: [{ role: 'user', content: 'Hello' }] });
   assert.equal(result.text, 'Ready'); assert.equal(result.finishReason, 'stop');
   assert.equal(events.filter(event => event.type === 'chunk').length, 2);
+  expectedFormat = { type: 'json_object' };
+  await runner.complete({ id: 'project:live', lease: 'test-lease', kind: 'project', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a JSON action' }] });
+  expectedFormat = { type: 'json_object', required: ['commands','done'] };
+  await runner.complete({ id: 'project:action', lease: 'test-lease', kind: 'project-action', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a workspace command' }] });
+  expectedFormat = { type: 'json_object', required: ['html'] };
+  await runner.complete({ id: 'project:file', lease: 'test-lease', kind: 'project-html', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a standalone page' }] });
   await assert.rejects(runner.complete({ id: 'reply:stale', lease: 'old', messages: [{ role: 'user', content: 'Hello' }] }), /loaded again/);
 });
 test('renderer adapter uses native chat and coding APIs without importing WebLLM', async () => {

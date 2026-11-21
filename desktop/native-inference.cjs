@@ -253,7 +253,7 @@ class NativeInference {
     const controller = new AbortController(), job = { id, controller };
     this.jobs.set(id, job);
     const signal = parentSignal ? AbortSignal.any([controller.signal, parentSignal]) : controller.signal;
-    const limits = { plan: 180000, chat: 480000, code: 1200000, title: 45000, summary: 90000, verify: 90000 };
+    const limits = { plan: 180000, chat: 480000, code: 1200000, project: 1200000, 'project-action': 1200000, 'project-html': 1200000, title: 45000, summary: 90000, verify: 90000 };
     const limit = limits[value.kind] || limits.chat;
     const timeout = () => controller.abort(failure('Apex stopped responding. Its desktop runner was reset; send again to retry.', 'TIMEOUT'));
     const absolute = setTimeout(timeout, limit);
@@ -268,6 +268,20 @@ class NativeInference {
         method: 'POST', signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${server.apiKey}` },
         body: JSON.stringify({ model: 'local', messages, stream: true, max_tokens: maxTokens, temperature,
+          ...(kind === 'project' ? { response_format: { type: 'json_object' } } : {}),
+          ...(kind === 'project-action' ? { response_format: { type: 'json_object', schema: {
+            type: 'object', required: ['commands', 'done'], additionalProperties: false,
+            properties: {
+              commands: { type: 'array', maxItems: 4, items: {
+                type: 'object', required: ['name', 'args'], additionalProperties: false,
+                properties: { name: { type: 'string' }, args: { type: 'object', additionalProperties: true } }
+              } },
+              done: { type: 'boolean' }, progress: { type: 'string' }, summary: { type: 'string' }
+            }
+          } } } : {}),
+          ...(kind === 'project-html' ? { response_format: { type: 'json_object', schema: {
+            type: 'object', properties: { html: { type: 'string' } }, required: ['html'], additionalProperties: false
+          } } } : {}),
           top_p: 0.9, min_p: 0, repeat_penalty: 1.1, chat_template_kwargs: { enable_thinking: false } })
       });
       if (!response.ok || !response.body) {

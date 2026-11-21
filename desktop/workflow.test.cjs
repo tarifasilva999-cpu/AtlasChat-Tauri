@@ -52,7 +52,8 @@ async function workspace(t, check, {persistent = true, singleFile = false, gener
     }
   };
   const engine = { interruptGenerate() {}, chat: { completions: {
-    async create({ messages }) {
+    async create({ messages, _atlasKind }) {
+      assert.ok(['project','project-action','project-html'].includes(_atlasKind));
       const prompt = messages[1].content;
       const custom = generate?.(prompt);
       if (custom) return (async function* () {
@@ -87,17 +88,23 @@ async function workspace(t, check, {persistent = true, singleFile = false, gener
   return { coding, state, chat, store, downloads, checks: () => checks, cancelled: () => cancelled, writes: () => sourceWrites };
 }
 test('a cut-off coding action compacts context and resumes in saved chunks past the old call limit', async t => {
-  let attempt = 0;
+  let attempt = 0, invalidAction = false;
   const env = await workspace(t, async () => ({passed:true,executed:true,behaviorVerified:true,checks:[]}), {
     persistent:false, singleFile:true,
     generate(prompt) {
       if (!prompt.startsWith('Project task:')) return;
       assert.match(prompt, /Build a Python project/);
       assert.match(prompt, /main.py is the program entrypoint/);
+      if (attempt === 1 && !invalidAction) {
+        assert.match(prompt, /previous response was cut off/);
+        invalidAction = true;
+        return {content: '{"commands":[{"name":"CodeEdit","args":{}}]}'};
+      }
       const step = attempt++;
       if (!step) return {content:'{"commands":[{"name":"CREATE_FILE"',finish:'length'};
       if (step === 1) {
-        assert.match(prompt,/previous response was cut off/);
+        assert.match(prompt,/previous response was not a valid project action/);
+        assert.match(prompt,/exactly one command/);
         assert.doesNotMatch(prompt,/Earlier project tasks:/);
       } else {
         assert.ok(prompt.includes('Continue after line ' + (step - 1)));
@@ -115,7 +122,7 @@ test('a cut-off coding action compacts context and resumes in saved chunks past 
   const run = await env.store.read(message.scratchRunId);
   const [file] = await env.store.source(run.id);
   assert.equal(file.content, Array.from({length:12}, (_, i) => 'print(' + (i + 1) + ')\n').join(''));
-  assert.equal(run.tasks[0].metrics.modelCalls, 14);
+  assert.equal(run.tasks[0].metrics.modelCalls, 15);
   assert.ok(run.events.some(event => event.stage === 'Compacting context'));
   assert.equal(message.codingArtifact.draft, false);
 });
@@ -236,4 +243,46 @@ test('normal coding chat saves multiple files as a ZIP when execution is unavail
   const {unzipSync} = require('fflate');
   const zip = unzipSync(await env.store.readCodingArtifact(artifact.id, artifact.filename));
   assert.deepEqual(Object.keys(zip).sort(), ['main.py', 'test_main.py']);
+});
+
+test('coding failure follow-ups use the saved error and actual download status', async t => {
+  const request = 'can you code me a random thing, surprise me. and return it to me as a downloadable file';
+  const env = await workspace(t, async () => assert.fail('An invalid action must not reach checks'), {
+    persistent:false,
+    generate:() => ({content:'I can write a downloadable file.'})
+  });
+  env.chat.messages[0].content = request;
+  assert.equal(env.coding.shouldRun(request), true);
+  await env.coding.run(request);
+  const previous = env.chat.messages.at(-1);
+  assert.match(previous.projectTaskError, /invalid workspace action/);
+  assert.equal(previous.codingArtifact, undefined);
+  assert.equal(env.coding.explainTaskFailure('whyd task end early?', env.chat),
+    previous.projectTaskError + ' This task did not produce a download.');
+  assert.equal(env.coding.explainTaskFailure('make me a file', env.chat), '');
+  previous.projectTaskError = 'Atlas could not produce a complete project action. Saved files were kept.';
+  previous.codingArtifact = {draft:true};
+  assert.match(env.coding.explainTaskFailure('why did it stop?', env.chat), /Limit coding generation turned off.*saved draft/);
+});
+
+test('an open-ended download saves a standalone HTML file without a separate model plan', async t => {
+  const request = 'can you code me a random thing, surprise me. and return it to me as a downloadable file';
+  const html = '<!doctype html><html><title>Surprise</title><button>Click me</button></html>';
+  const env = await workspace(t, async ({ attempt }) => attempt === 1
+    ? {passed:false,executed:true,checks:[{command:'Static audit',exitCode:1,output:'Unexpected end of input'}]}
+    : {passed:true,executed:true,behaviorVerified:true,checks:[]}, {
+    persistent:false,
+    generate(prompt) {
+      assert.match(prompt, /^User request:/);
+      assert.match(prompt, /must work when opened from disk/);
+      if (!prompt.includes('Check failure:')) return {content: JSON.stringify({html:'<!doctype html><html><script>(() => {</script></html>'})};
+      assert.match(prompt, /Unexpected end of input/);
+      return {content: JSON.stringify({html})};
+    }
+  });
+  await env.coding.run(request);
+  const message = env.chat.messages.at(-1);
+  assert.equal(message.projectTaskError, undefined, message.content);
+  assert.equal(message.codingArtifact.filename, 'index.html');
+  assert.equal((await env.store.readCodingArtifact(message.codingArtifact.id, 'index.html')).toString(), html);
 });

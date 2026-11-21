@@ -3992,6 +3992,11 @@ Local date/time: ${current}.${global}${local}`
     const codeTask=isCodeRequest(latest)||codeContinuation;
     const codingRequest=messageContextContent(latestUser,MAX_COMPOSER_TEXT_CHARS);
     if(latestUser?.mentions?.includes("image")){void generatePoem3Image(codingRequest);return;}
+    const taskFailure=window.AtlasCoding?.explainTaskFailure(latest,c);
+    if(taskFailure&&!latestUser?.attachments?.length&&!latestUser?.mentions?.length){
+      pushToChat(c,"assistant",taskFailure);
+      return;
+    }
     const preferredChoice=c.modelChoice||state.modelChoice;
     const choice=hasReplyInOtherChat(c.id)&&!modelChoicesWhileBackground().has(preferredChoice)?state.modelChoice:preferredChoice;
     if(ai.choice!==choice){
