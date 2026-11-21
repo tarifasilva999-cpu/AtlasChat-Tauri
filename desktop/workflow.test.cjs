@@ -14,7 +14,7 @@ const element = tagName => ({
   replaceChildren(...items) { this.children = items; },
   setAttribute() {}, classList: { add() {}, remove() {} }
 });
-async function workspace(t, check, {persistent = true, singleFile = false} = {}) {
+async function workspace(t, check, {persistent = true, singleFile = false, generate} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-workflow-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const store = new ProjectManager(path.join(root, 'projects')); await store.init();
@@ -54,6 +54,10 @@ async function workspace(t, check, {persistent = true, singleFile = false} = {})
   const engine = { interruptGenerate() {}, chat: { completions: {
     async create({ messages }) {
       const prompt = messages[1].content;
+      const custom = generate?.(prompt);
+      if (custom) return (async function* () {
+        yield { choices: [{ delta: { content: custom.content }, finish_reason: custom.finish || 'stop' }] };
+      })();
       let output;
       if (prompt.startsWith('Plan this')) output = JSON.stringify({ title: 'Example', runtime: 'python', entrypoint: 'main.py',architecture:'main.py is the program entrypoint.',
         summary: 'Write a small program.', files: [{ path: 'main.py', purpose: 'program' }, ...(!singleFile ? [{ path: 'test_main.py', purpose: 'test' }] : [])] });
@@ -82,6 +86,53 @@ async function workspace(t, check, {persistent = true, singleFile = false} = {})
     persist() {}, render() {}, controls() {}, updateModels() {}, ready() {}, toast() {} });
   return { coding, state, chat, store, downloads, checks: () => checks, cancelled: () => cancelled, writes: () => sourceWrites };
 }
+test('a cut-off coding action compacts context and resumes in saved chunks past the old call limit', async t => {
+  let attempt = 0;
+  const env = await workspace(t, async () => ({passed:true,executed:true,behaviorVerified:true,checks:[]}), {
+    persistent:false, singleFile:true,
+    generate(prompt) {
+      if (!prompt.startsWith('Project task:')) return;
+      assert.match(prompt, /Build a Python project/);
+      assert.match(prompt, /main.py is the program entrypoint/);
+      const step = attempt++;
+      if (!step) return {content:'{"commands":[{"name":"CREATE_FILE"',finish:'length'};
+      if (step === 1) {
+        assert.match(prompt,/previous response was cut off/);
+        assert.doesNotMatch(prompt,/Earlier project tasks:/);
+      } else {
+        assert.ok(prompt.includes('Continue after line ' + (step - 1)));
+        assert.ok(prompt.includes('print(' + (step - 1) + ')'));
+      }
+      return {content:JSON.stringify({
+        commands:[{name:step === 1 ? 'CREATE_FILE' : 'APPEND_FILE',args:{path:'main.py',content:'print(' + step + ')\n'}}],
+        done:step === 12, progress:'Continue after line ' + step, summary:'The script prints twelve numbers.'
+      })};
+    }
+  });
+  await env.coding.run('Build a Python project');
+  const message = env.chat.messages.at(-1);
+  assert.equal(message.projectTaskError, undefined);
+  const run = await env.store.read(message.scratchRunId);
+  const [file] = await env.store.source(run.id);
+  assert.equal(file.content, Array.from({length:12}, (_, i) => 'print(' + (i + 1) + ')\n').join(''));
+  assert.equal(run.tasks[0].metrics.modelCalls, 14);
+  assert.ok(run.events.some(event => event.stage === 'Compacting context'));
+  assert.equal(message.codingArtifact.draft, false);
+});
+
+test('the generation limit setting stops a cut-off action without applying it', async t => {
+  const env = await workspace(t, async () => { throw new Error('Unexpected check'); }, {
+    persistent:false, singleFile:true,
+    generate:prompt => prompt.startsWith('Project task:') ? {content:'{"commands":[',finish:'length'} : undefined
+  });
+  env.coding.restorePreferences({limitGeneration:true});
+  await env.coding.run('Build a Python project');
+  const message = env.chat.messages.at(-1);
+  assert.match(message.projectTaskError, /Limit coding generation/);
+  assert.deepEqual(await env.store.source(message.scratchRunId), []);
+  assert.equal(env.checks(), 0);
+});
+
 test('a failed check repairs source and reruns, while snippets remain quick', async t => {
   const env = await workspace(t, async ({ attempt }) => attempt === 1
     ? { passed: false, executed: true, checks: [{ command: 'python test_main.py', exitCode: 1, output: 'AssertionError' }], reason: 'Check failed.' }

@@ -334,6 +334,14 @@ class ProjectManager extends Store {
           if (previous && args.baseHash !== fingerprint(previous)) throw new Error('HASH_CONFLICT: read current file before replacing it.');
           result = await mutate(source.filter(f => f.path !== p).concat({ path:p, content:args.content, ...(args.encoding ? {encoding:args.encoding} : {}) })); break;
         }
+        case 'APPEND_FILE': {
+          const f = file();
+          if (f.encoding === 'base64') throw new Error('Cannot append to a binary file.');
+          if (args.baseHash !== fingerprint(f)) throw new Error('HASH_CONFLICT: re-read the file.');
+          if (typeof args.content !== 'string' || !args.content.length) throw new Error('Append needs text content.');
+          result = await mutate(source.map(s => s === f ? {...f, content: f.content + args.content} : s));
+          break;
+        }
         case 'PATCH_FILE': {
           const f = file(); if (f.encoding === 'base64') throw new Error('Cannot patch binary files.');
           if (args.baseHash !== fingerprint(f)) throw new Error('HASH_CONFLICT: re-read the file.');
@@ -418,12 +426,12 @@ class ProjectManager extends Store {
         }
         case 'START_TASK': {
           if(run.tasks.some(t=>t.status==='working'))throw new Error('PROJECT_BUSY: finish the active task first.');
-          const level=complexity(String(args.request || ''),Number(args.fileCount)||0),t={id:crypto.randomUUID(),chatId,request:String(args.request||'').slice(0,1800),complexity:level,policy:POLICIES[level],status:'working',at:Date.now(),evidence:[],events:[],metrics:{modelCalls:0,inputChars:0,outputChars:0,contextChars:0,filesRead:0,filesChanged:0,buildAttempts:0,repairAttempts:0,researchCalls:0}};
+          const level=complexity(String(args.request || ''),Number(args.fileCount)||0),t={id:crypto.randomUUID(),chatId,request:String(args.request||'').slice(0,1800),complexity:level,policy:POLICIES[level],limitGeneration:args.limitGeneration !== false,status:'working',at:Date.now(),evidence:[],events:[],metrics:{modelCalls:0,inputChars:0,outputChars:0,contextChars:0,filesRead:0,filesChanged:0,buildAttempts:0,repairAttempts:0,researchCalls:0}};
           run.tasks.push(t);run.tasks=run.tasks.slice(-50);run.status='working';run.lastCheck=null;result=t;break;
         }
         case 'RECORD_CALL': {
-          if(!task||task.status!=='working')throw new Error('No active task.');if(task.metrics.modelCalls>=task.policy.calls)throw new Error('MODEL_BUDGET_EXHAUSTED: completed files retained.');
-          task.metrics.modelCalls++;task.metrics.inputChars+=Math.max(0,Number(args.inputChars)||0);result={remaining:task.policy.calls-task.metrics.modelCalls};break;
+          if(!task||task.status!=='working')throw new Error('No active task.');if(task.limitGeneration !== false && task.metrics.modelCalls>=task.policy.calls)throw new Error('MODEL_BUDGET_EXHAUSTED: completed files retained.');
+          task.metrics.modelCalls++;task.metrics.inputChars+=Math.max(0,Number(args.inputChars)||0);result={remaining:task.limitGeneration === false ? null : task.policy.calls-task.metrics.modelCalls};break;
         }
         case 'RECORD_OUTPUT': if(task)task.metrics.outputChars+=Math.max(0,Number(args.chars)||0);result={saved:true};break;
         case 'BUILD_ATTEMPT': if(task)task.metrics.buildAttempts++;result={saved:true};break;

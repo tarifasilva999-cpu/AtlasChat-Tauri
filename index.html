@@ -701,13 +701,13 @@
   const RUNTIME_READY_KEY = window.atlasDesktop?"atlas.native.75.v1.ready":"atlas.webllm.quality.v2.ready";
   const ULTRA_CODE_MODEL_ID="atlas-native-code";
   const CONTEXT_OPTIONS={
-    fixed:[{name:"Standard",tokens:4096}],
-    "apex-pro":[{name:"Standard",tokens:4096},{name:"Expanded",tokens:6144},{name:"High",tokens:10240}],
+    fixed:[{name:"Standard",tokens:8192}],
+    "apex-pro":[{name:"Standard",tokens:8192},{name:"Expanded",tokens:9216},{name:"High",tokens:10240}],
     "apex-ultra":[{name:"Standard",tokens:10240},{name:"Expanded",tokens:16384},{name:"High",tokens:36864}],
     "ultra-code":[{name:"Standard",tokens:24576},{name:"Expanded",tokens:49152},{name:"High",tokens:65536}]
   };
   const EFFORT_LEVELS=["low","medium","high","max"];
-  const EFFORT_CONTEXT_WINDOWS={apex:[8192,16384,24576,32768],ultraCode:[8192,16384,24576,32768],other:4096};
+  const EFFORT_CONTEXT_WINDOWS={apex:[8192,8192,24576,32768],ultraCode:[8192,8192,24576,32768]};
   const EFFORT_GUIDANCE={
     low:"Use a direct, lightweight approach. Answer fully, but keep optional analysis brief and coding changes focused.",
     medium:"Use balanced care. Check the key details and give enough explanation to make the answer useful.",
@@ -725,7 +725,7 @@
     if(choice==="ultra-code")return EFFORT_CONTEXT_WINDOWS.ultraCode[effortIndex(effort)];
     if(choice.startsWith("apex-"))return EFFORT_CONTEXT_WINDOWS.apex[effortIndex(effort)];
     const profile=contextProfileForChoice(choice),index=profile==="fixed"?0:preferences?.[profile]||0;
-    return CONTEXT_OPTIONS[profile][index]?.tokens||4096;
+    return CONTEXT_OPTIONS[profile][index]?.tokens||8192;
   }
   function contextLabel(option){return `${option.name} (${Math.round(option.tokens/1024)}K)`}
 
@@ -4029,7 +4029,7 @@ Local date/time: ${current}.${global}${local}`
       state.pendingChatId=null;
       state.pendingRequest="";
       setReplyControls(false);
-      const contextLabel=`${Math.round((state.contextWindowSize||4096)/1024)}K`;
+      const contextLabel=`${Math.round((state.contextWindowSize||8192)/1024)}K`;
       const detail=`This request exceeds the local model's ${contextLabel}-token window. Shorten it or split it into parts; Atlas kept your full message in this chat.`;
       if(state.activeChatId===c.id)showFriendlyError(detail);else showToast(detail);
       renderHistory();

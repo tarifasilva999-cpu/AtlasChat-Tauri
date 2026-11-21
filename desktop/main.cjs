@@ -152,7 +152,7 @@ app.whenReady().then(async () => {
   });
   handle('projectCommand', async value => {
     const id=runId(value.id);
-    const mutations=['WRITE_FILE','CREATE_FILE','PATCH_FILE','DELETE_FILE','MOVE_FILE','RENAME_FILE','CREATE_DIRECTORY','ROLLBACK','SET_MANIFEST','SET_COMMANDS','SET_PROJECT_MEMORY'];
+    const mutations=['WRITE_FILE','CREATE_FILE','PATCH_FILE','APPEND_FILE','DELETE_FILE','MOVE_FILE','RENAME_FILE','CREATE_DIRECTORY','ROLLBACK','SET_MANIFEST','SET_COMMANDS','SET_PROJECT_MEMORY'];
     const commands=value.name==='BATCH'?value.args?.commands || []:[value];
     if(checking.has(id)&&commands.some(c=>mutations.includes(c.name)))throw new Error('Wait for verification to finish before editing.');
     if(['BUILD','RUN','RUN_TESTS','RUN_BROWSER_TEST'].includes(value.name))return execute(id);
