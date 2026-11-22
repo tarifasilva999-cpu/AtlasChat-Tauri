@@ -54,26 +54,40 @@
     if(plan.title==="Your plan"&&subject)plan.title=subject.replace(/^./,char=>char.toUpperCase());
     return plan;
   }
-  const instructions="\n\nINLINE PLAN VISUALS: Put one focused visual inside the prose of a substantial plan; keep the rest as normal conversation. Choose a form that fits the plan, with no fixed card template. Make the graphic small and specific, with visible labels and a few meaningful steps, nodes, or relationships. Prefer inline SVG or simple HTML/CSS. Never emit unexplained color blocks, blank graphics, or a grid of text cards. Use ```atlas-ui for compact inserts (up to 560px); use ```atlas-ui-wide only when the idea genuinely needs more room. Use Atlas's --sans font, charcoal surfaces, readable contrast, and restrained separators. Only self-contained HTML/CSS/SVG is available: no scripts, event handlers, forms, external resources, or invented image URLs. A visual is illustrative; it does not mean Atlas searched or took action.";
-  const api={hasPlan,parsePlan,instructions};
+  const instructions=`\n\nINLINE VISUALS: Include one focused visual when requested or when exploring the answer through interaction adds something useful, such as comparing options, adjusting a simulation, or opening details on a timeline. Place it between relevant paragraphs.
+Use one atlas-ui fenced block (atlas-ui-wide for a genuinely wider visual). Put the opening and closing triple backticks on their own lines. Inside, put a <style> block, semantic HTML (and inline SVG or canvas if useful), and a plain inline <script> after the markup for interactions. Use native buttons and labeled inputs. Wire each control to visible panels, values, or graphics with addEventListener. Include a useful initial view and keep it usable on narrow screens and with a keyboard. Use Atlas theme variables such as --sans, --surface, --text, and --line. Keep the visual self-contained, with no libraries, external assets, network calls, or invented live data. Use normal code fences when the user asks for source code or files.`;
+  function wantsVisual(text){
+    const source=String(text||"");
+    return /\b(?:inline (?:visual|demo|widget|chart|diagram|simulation)|in-chat (?:visual|demo|widget|chart|diagram|simulation)|(?:visual|demo|widget|chart|diagram|simulation) (?:right )?(?:in|inside) (?:this |the )?chat)\b/i.test(source)&&
+      !/\b(?:source code|code snippet)\b/i.test(source);
+  }
+  const api={hasPlan,parsePlan,instructions,wantsVisual};
   if(typeof module!=="undefined"&&module.exports)module.exports={...api,safeCSS,plainText};
   if(typeof document==="undefined")return;
-  const pools=new WeakMap(),records=new WeakMap(),live=new Set();
+  const records=new WeakMap();
   const uid=()=>globalThis.crypto?.randomUUID?.()||`atlas-ui-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const allowed=new Set("div span p section article header footer main aside nav h1 h2 h3 h4 h5 h6 ul ol li strong b em i small mark blockquote pre code br hr table caption thead tbody tfoot tr th td details summary label input img figure figcaption a style svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc pattern use".split(" "));
-  const blocked=new Set("script iframe object embed link meta base form button textarea select video audio source canvas foreignobject animate animatetransform set".split(" "));
+  const allowed=new Set("div span p section article header footer main aside nav h1 h2 h3 h4 h5 h6 ul ol li dl dt dd strong b em i small mark blockquote pre code br hr table caption thead tbody tfoot tr th td details summary label input button textarea select option optgroup fieldset legend output meter progress img figure figcaption a style canvas svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc pattern use".split(" "));
+  const blocked=new Set("script iframe frame frameset object embed link meta base video audio source foreignobject animate animatetransform set".split(" "));
   function safeCSS(css){
     return String(css||"").replace(/@import\b[^;]*;?/gi,"").replace(/url\s*\(([^)]*)\)/gi,(_,value)=>{
       const url=value.trim().replace(/^['"]|['"]$/g,"");
       return /^#[\w-]+$/.test(url)?`url(${url})`:"none";
     }).replace(/expression\s*\([^)]*\)/gi,"").replace(/(?:-moz-binding|behavior)\s*:[^;}]*/gi,"");
   }
-  function sanitize(source){
+  function sanitize(source,interactive){
     const template=document.createElement("template");
     template.innerHTML=String(source||"");
+    const scripts=[];
     for(const node of [...template.content.querySelectorAll("*")]){
+      if(!template.content.contains(node))continue;
       const tag=node.localName.toLowerCase();
-      if(blocked.has(tag)){node.remove();continue;}
+      if(tag==="script"){
+        const type=(node.getAttribute("type")||"").trim().toLowerCase();
+        if(interactive&&node.namespaceURI==="http://www.w3.org/1999/xhtml"&&!node.hasAttribute("src")&&
+          /^(?:|text\/javascript|application\/javascript)$/.test(type)&&node.textContent.trim())scripts.push(node.textContent);
+        node.remove();continue;
+      }
+      if(blocked.has(tag)||(tag==="title"&&node.namespaceURI==="http://www.w3.org/1999/xhtml")){node.remove();continue;}
       if(!allowed.has(tag)){node.replaceWith(...node.childNodes);continue;}
       if(tag==="style")node.textContent=safeCSS(node.textContent);
       for(const attr of [...node.attributes]){
@@ -86,15 +100,15 @@
           if(tag!=="img"||!/^data:image\/(?:png|jpeg|webp|gif|svg\+xml);/i.test(value))node.removeAttribute(attr.name);
         }
       }
-      if(tag==="input"&&!/^(?:checkbox|radio)$/i.test(node.getAttribute("type")||""))node.replaceWith(document.createTextNode(node.getAttribute("value")||""));
+      if(tag==="input"&&/^(?:file|image|password|hidden)$/i.test(node.type))node.remove();
     }
-    return template.innerHTML;
+    return {markup:template.innerHTML,scripts};
   }
   function hasReadableLabels(markup){
     const template=document.createElement("template");
     template.innerHTML=String(markup||"");
-    const labels=[...template.content.querySelectorAll("[aria-label],title,desc")]
-      .map(node=>node.getAttribute("aria-label")||node.textContent||"").join(" ");
+    const labels=[...template.content.querySelectorAll("[aria-label],img[alt],input[value],title,desc")]
+      .map(node=>node.getAttribute("aria-label")||node.getAttribute("alt")||node.getAttribute("value")||node.textContent||"").join(" ");
     template.content.querySelectorAll("style").forEach(node=>node.remove());
     const text=`${template.content.textContent||""} ${labels}`.replace(/\s+/g,"").trim();
     return text.length>=3;
@@ -104,65 +118,108 @@
     for(const name of ["bg","surface","surface-2","text","text-2","muted","line","sans"])values[`--${name}`]=computed.getPropertyValue(`--${name}`).trim();
     return values;
   }
-  const baseCSS="html,body{margin:0!important;padding:0!important;min-height:0!important;background:transparent!important}body{font:14px/1.55 var(--sans,system-ui,sans-serif);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased}*,*:before,*:after{box-sizing:border-box}#atlas-inline-root{display:flow-root;max-width:100%;overflow-wrap:anywhere}#atlas-inline-root>*{max-width:100%}img,svg,table{max-width:100%}img{height:auto}h1,h2,h3,h4,h5,h6{line-height:1.25}p{margin:0 0 12px}ul,ol{padding-left:20px}li{margin:4px 0}pre{overflow:auto;padding:14px;background:var(--bg);border-radius:8px}code{font-family:ui-monospace,monospace;font-size:.9em}summary{cursor:pointer;color:var(--text);font-weight:600}details{padding:10px 0}details>p{margin:10px 0 0}input{accent-color:var(--text)}a{color:inherit}html[data-reduce-motion=true] *,html[data-reduce-motion=true] *:before,html[data-reduce-motion=true] *:after{animation:none!important;transition:none!important}";
+  const baseCSS=`
+    html,body{margin:0!important;padding:0!important;min-height:0!important;background:transparent!important}
+    body{font:14px/1.55 var(--sans,system-ui,sans-serif);color:var(--text);-webkit-font-smoothing:antialiased}
+    *,*:before,*:after{box-sizing:border-box}
+    #atlas-inline-root{display:flow-root;max-width:100%;overflow-wrap:anywhere}
+    #atlas-inline-root>*,img,svg,canvas,table{max-width:100%}
+    img{height:auto}
+    h1,h2,h3,h4,h5,h6{line-height:1.25}
+    p{margin:0 0 12px}
+    ul,ol{padding-left:20px}li{margin:4px 0}
+    pre{overflow:auto;padding:14px;background:var(--bg);border-radius:8px}
+    code{font-family:ui-monospace,monospace;font-size:.9em}
+    summary{cursor:pointer;color:var(--text);font-weight:600}
+    details{padding:10px 0}details>p{margin:10px 0 0}
+    button,input,select,textarea{font:inherit;color:inherit;max-width:100%;accent-color:var(--text)}
+    button,select{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:4px 9px}
+    button:enabled{cursor:pointer}
+    :focus-visible{outline:2px solid var(--text);outline-offset:2px}
+    a{color:inherit}
+    html[data-reduce-motion=true] *,html[data-reduce-motion=true] *:before,html[data-reduce-motion=true] *:after{animation:none!important;transition:none!important}
+  `;
+  function runVisual(id,scripts){
+    const root=document.getElementById("atlas-inline-root");
+    let lastHeight=0;
+    function measure(){
+      const height=Math.ceil(root.getBoundingClientRect().height);
+      if(height===lastHeight)return;
+      lastHeight=height;
+      parent.postMessage({atlasInline:id,height},"*");
+    }
+    new ResizeObserver(measure).observe(root);
+    addEventListener("load",measure,{once:true});
+    root.addEventListener("change",()=>{
+      const checked=[...root.querySelectorAll('input[type="checkbox"],input[type="radio"]')].map(input=>input.checked);
+      parent.postMessage({atlasInline:id,checked},"*");
+    });
+    addEventListener("message",event=>{
+      if(event.source!==parent||event.data?.atlasInline!==id)return;
+      for(const [key,value] of Object.entries(event.data.theme))document.documentElement.style.setProperty(key,value);
+      document.documentElement.dataset.reduceMotion=String(event.data.reduceMotion);
+    });
+    for(const source of scripts){
+      const script=document.createElement("script");
+      script.textContent=source;
+      document.body.appendChild(script);
+    }
+    measure();
+  }
   function documentFor(record){
-    const nonce=uid().replace(/-/g,"");
     const colors=Object.entries(theme()).map(([key,value])=>`${key}:${value}`).join(";");
-    const bootstrap=`(()=>{const id=${JSON.stringify(record.id)},root=document.getElementById('atlas-inline-root'),saved=${JSON.stringify(record.state||{})};const details=[...root.querySelectorAll('details')],inputs=[...root.querySelectorAll('input')];(saved.details||[]).forEach((v,i)=>{if(details[i])details[i].open=v});(saved.inputs||[]).forEach((v,i)=>{if(inputs[i])inputs[i].checked=v});let last=0;const measure=()=>{const height=Math.ceil(root.getBoundingClientRect().height);if(Math.abs(height-last)>1){last=height;parent.postMessage({atlasInline:id,height},'*')}};new ResizeObserver(measure).observe(root);root.addEventListener('load',measure,true);const state=()=>{parent.postMessage({atlasInline:id,state:{details:details.map(n=>n.open),inputs:inputs.map(n=>n.checked)}},'*');measure()};root.addEventListener('toggle',state,true);root.addEventListener('change',state);addEventListener('message',event=>{if(event.source!==parent||event.data?.atlasInline!==id)return;for(const [key,value] of Object.entries(event.data.theme||{}))document.documentElement.style.setProperty(key,value);document.documentElement.dataset.reduceMotion=String(!!event.data.reduceMotion);measure()});measure()})()`;
-    return `<!doctype html><html data-reduce-motion="${document.documentElement.dataset.reduceMotion==="true"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'"><style>:root{${colors}}${baseCSS}</style></head><body><div id="atlas-inline-root">${record.markup}</div><script nonce="${nonce}">${bootstrap}</script></body></html>`;
-  }
-  function begin(container){
-    pools.set(container,{frames:[...container.querySelectorAll(".atlas-ui-frame")],index:0});
-  }
-  function applyMarkup(record){
-    clearTimeout(record.updateTimer);record.updateTimer=null;
-    if(record.pendingMarkup===null)return;
-    record.markup=record.pendingMarkup;
-    record.appliedSource=record.pendingMarkup;
-    record.pendingMarkup=null;
-    record.lastUpdate=Date.now();
-    record.frame.srcdoc=documentFor(record);
+    const scripts=JSON.stringify(record.scripts).replace(/</g,"\\u003c");
+    const bootstrap=`(${runVisual})(${JSON.stringify(record.id)},${scripts})`;
+    return `<!doctype html><html data-reduce-motion="${document.documentElement.dataset.reduceMotion==="true"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; script-src-attr 'none'; img-src data:; base-uri 'none'; form-action 'none'"><style>:root{${colors}}${baseCSS}</style></head><body><div id="atlas-inline-root">${record.markup}</div><script>${bootstrap}</script></body></html>`;
   }
   function render(wrapper,source,options={}){
-    const markup=sanitize(String(source||""));
-    if(!hasReadableLabels(markup))return;
-    const pool=pools.get(options.container),frame=pool?.frames[pool.index++]||document.createElement("iframe");
-    let record=records.get(frame);
-    const size=options.size==="wide"?"wide":"compact";
-    if(!record){
-      frame.className="atlas-ui-frame";frame.title="Inline visual";frame.setAttribute("sandbox","allow-scripts");frame.setAttribute("referrerpolicy","no-referrer");
-      const shell=document.createElement("section");shell.className="atlas-ui-shell";shell.appendChild(frame);
-      record={id:uid(),frame,shell,source:"",appliedSource:"",pendingMarkup:null,markup:"",state:{},lastUpdate:0,updateTimer:null};records.set(frame,record);live.add(record);
-    }
-    record.shell.className=`atlas-ui-shell atlas-ui-shell--${size}`;
-    if(record.source!==markup){record.source=markup;record.pendingMarkup=markup;}
-    if(record.pendingMarkup!==null){
-      if(options.complete||!record.lastUpdate)applyMarkup(record);
-      else if(!record.updateTimer)record.updateTimer=setTimeout(()=>applyMarkup(record),Math.max(0,500-(Date.now()-record.lastUpdate)));
-    }
-    wrapper.appendChild(record.shell);
-    for(const item of live)if(item!==record&&!item.frame.isConnected&&!pool?.frames.includes(item.frame)){clearTimeout(item.updateTimer);live.delete(item);}
+    const {markup,scripts}=sanitize(source,options.interactive===true);
+    if(!hasReadableLabels(markup))return false;
+    const frame=document.createElement("iframe"),shell=document.createElement("section");
+    frame.className="atlas-ui-frame";
+    frame.title="Inline visual";
+    frame.setAttribute("sandbox","allow-scripts");
+    frame.setAttribute("referrerpolicy","no-referrer");
+    shell.className=`atlas-ui-shell atlas-ui-shell--${options.size==="wide"?"wide":"compact"}`;
+    const record={id:uid(),markup,scripts,checked:[]};
+    records.set(frame,record);
+    frame.srcdoc=documentFor(record);
+    shell.appendChild(frame);
+    wrapper.appendChild(shell);
+    return true;
   }
   function tryRawMarkup(wrapper,source,options){
     if(!/```/.test(source)&&/<style\b/i.test(source)&&/<(?:article|section)\b/i.test(source)){
       const start=String(source).search(/<(?:style|article|section)\b/i);
-      if(start>0){const intro=document.createElement("div");intro.innerHTML=options.markdown(String(source).slice(0,start));wrapper.appendChild(intro);}
-      render(wrapper,String(source).slice(start),options);return true;
+      if(!render(wrapper,String(source).slice(start)))return false;
+      if(start>0){const intro=document.createElement("div");intro.innerHTML=options.markdown(String(source).slice(0,start));wrapper.prepend(intro);}
+      return true;
     }
     return false;
   }
   addEventListener("message",event=>{
-    for(const record of live){
-      if(event.source!==record.frame.contentWindow||event.data?.atlasInline!==record.id)continue;
+    if(event.origin!=="null"||typeof event.data?.atlasInline!=="string")return;
+    for(const frame of document.querySelectorAll(".atlas-ui-frame")){
+      const record=records.get(frame);
+      if(event.source!==frame.contentWindow||event.data.atlasInline!==record?.id)continue;
       if(Number.isFinite(event.data.height)){
-        record.frame.style.height=`${Math.max(1,Math.min(1000000,event.data.height))}px`;
-        document.dispatchEvent(new CustomEvent("atlas-inline-ui-resize"));
+        const height=`${Math.max(1,Math.min(4096,Math.ceil(event.data.height)))}px`;
+        if(frame.style.height!==height){
+          frame.style.height=height;
+          document.dispatchEvent(new CustomEvent("atlas-inline-ui-resize"));
+        }
       }
-      if(event.data.state&&typeof event.data.state==="object")record.state={details:Array.isArray(event.data.state.details)?event.data.state.details.map(Boolean):[],inputs:Array.isArray(event.data.state.inputs)?event.data.state.inputs.map(Boolean):[]};
+      if(Array.isArray(event.data.checked))record.checked=event.data.checked.slice(0,256).map(Boolean);
       break;
     }
   });
-  new MutationObserver(()=>{for(const record of live)if(record.frame.isConnected)record.frame.contentWindow?.postMessage({atlasInline:record.id,theme:theme(),reduceMotion:document.documentElement.dataset.reduceMotion==="true"},"*")}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme","data-reduce-motion"]});
+  new MutationObserver(()=>{
+    const values=theme(),reduceMotion=document.documentElement.dataset.reduceMotion==="true";
+    for(const frame of document.querySelectorAll(".atlas-ui-frame")){
+      const record=records.get(frame);
+      if(record)frame.contentWindow?.postMessage({atlasInline:record.id,theme:values,reduceMotion},"*");
+    }
+  }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme","data-reduce-motion"]});
   function plainText(node){
     if(node.nodeType===3)return node.textContent;
     const tag=node.localName||"";
@@ -180,17 +237,21 @@
       const record=records.get(original[index]);
       if(record){
         const fragment=document.createElement("div");fragment.innerHTML=record.markup;
-        [...fragment.querySelectorAll("input")].forEach((input,index)=>{if(record.state.inputs?.[index]!==undefined)input.checked=record.state.inputs[index];});
+        [...fragment.querySelectorAll('input[type="checkbox"],input[type="radio"]')].forEach((input,index)=>{
+          if(record.checked[index]!==undefined)input.checked=record.checked[index];
+        });
         shell.replaceWith(fragment);
       }else shell.remove();
     });
     clone.querySelectorAll("style,script,.code-copy,.cursor,.pause-spinner").forEach(node=>node.remove());
     clone.querySelectorAll("svg").forEach(node=>{const text=[...node.querySelectorAll("text,title,desc")].map(item=>item.textContent).join(" · ");node.replaceWith(document.createTextNode(text));});
-    clone.querySelectorAll("input").forEach(node=>node.replaceWith(document.createTextNode(node.checked?"☑ ":"☐ ")));
+    clone.querySelectorAll("input").forEach(node=>node.replaceWith(document.createTextNode(
+      /^(?:checkbox|radio)$/.test(node.type)?(node.checked?"☑ ":"☐ "):(node.getAttribute("aria-label")||node.value)
+    )));
     clone.querySelectorAll("img").forEach(node=>{if(!node.getAttribute("src"))node.replaceWith(document.createTextNode(node.alt||""));});
     const text=plainText(clone).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
     return {text:text||String(fallback||""),html:clone.innerHTML};
   }
-  Object.assign(api,{begin,render,tryRawMarkup,copyPayload});
+  Object.assign(api,{render,tryRawMarkup,copyPayload});
   window.AtlasInlineUI=api;
 })();

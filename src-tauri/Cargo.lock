@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "atlaschat-tauri"
-version = "2.9.2"
+version = "2.10.0"
 dependencies = [
  "base64 0.22.1",
  "open",
