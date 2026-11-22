@@ -1,6 +1,6 @@
 [package]
 name = "atlaschat-tauri"
-version = "2.11.0"
+version = "2.11.1"
 description = "AtlasChat local-first desktop"
 authors = ["AtlasAI"]
 edition = "2021"

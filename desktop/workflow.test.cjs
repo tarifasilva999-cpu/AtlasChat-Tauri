@@ -53,9 +53,9 @@ async function workspace(t, check, {persistent = true, singleFile = false, gener
   };
   const engine = { interruptGenerate() {}, chat: { completions: {
     async create({ messages, _atlasKind }) {
-      assert.ok(['project','project-action','project-html'].includes(_atlasKind));
+      assert.ok(['project','project-action','project-edit','project-html'].includes(_atlasKind));
       const prompt = messages[1].content;
-      const custom = generate?.(prompt);
+      const custom = generate?.(prompt, _atlasKind);
       if (custom) return (async function* () {
         yield { choices: [{ delta: { content: custom.content }, finish_reason: custom.finish || 'stop' }] };
       })();
@@ -263,6 +263,85 @@ test('coding failure follow-ups use the saved error and actual download status',
   previous.projectTaskError = 'Atlas could not produce a complete project action. Saved files were kept.';
   previous.codingArtifact = {draft:true};
   assert.match(env.coding.explainTaskFailure('why did it stop?', env.chat), /Limit coding generation turned off.*saved draft/);
+});
+
+test('a portfolio follow-up recovers repeated reads and exports a new ZIP', async t => {
+  const create = 'generate me a website, portfolio';
+  const edit = 'add a dark mode toggle. dont repeat processes and just update the files to have a dark mode toggle';
+  const files = {
+    'index.html': '<link rel="stylesheet" href="style.css"><h1>Portfolio</h1><script src="script.js"></script>',
+    'style.css': 'body { color: black; }',
+    'script.js': 'console.log("Portfolio");'
+  };
+  const action = (commands, done = false) => ({content:JSON.stringify({commands, done})});
+  const read = {name:'READ_FILE', args:{path:'index.html'}};
+  const patch = (path, search, replace) => ({name:'PATCH_FILE', args:{path, search, replace}});
+  let createCalls = 0, editCalls = 0;
+  const env = await workspace(t, async () => ({passed:true, executed:true, checks:[]}), {
+    persistent:false,
+    generate(prompt, kind) {
+      if (prompt.startsWith('Plan this')) return {content:JSON.stringify({
+        runtime:'web', entrypoint:'index.html', architecture:'Portfolio HTML, CSS and JavaScript.',
+        files:Object.keys(files).map(path => ({path, purpose:'Portfolio source'}))
+      })};
+      if (prompt.startsWith('Project task: ' + create)) {
+        if (createCalls++ === 0) return action(Object.entries(files).map(([path, content]) =>
+          ({name:'CREATE_FILE', args:{path, content}})));
+        return action([{name:'LIST_FILES', args:{}}]);
+      }
+      assert.ok(prompt.startsWith('Project task: ' + edit));
+      const fileIndex = JSON.parse(prompt.match(/^Project file index: (.+)$/m)[1]);
+      assert.deepEqual(fileIndex.paths.sort(), Object.keys(files).sort());
+      switch (editCalls++) {
+        case 0: return action([], true);
+        case 1:
+          assert.match(prompt, /No source edits have been saved/);
+          return action([read]);
+        case 2: return action([{name:'READ_FILE', args:{path:'style.css'}}]);
+        case 3: return action([read]);
+        case 4:
+          assert.equal(kind, 'project-edit');
+          assert.match(prompt, /Already attempted on the current files/);
+          assert.match(prompt, /<h1>Portfolio<\/h1>/);
+          assert.match(prompt, /body \{ color: black; \}/);
+          return action([
+            patch('index.html', '<h1>Portfolio</h1>', '<h1>Portfolio</h1><button id="theme">Dark mode</button>'),
+            patch('style.css', files['style.css'], files['style.css'] + '\nbody.dark { color: white; background: black; }'),
+            patch('script.js', files['script.js'], 'document.querySelector("#theme").onclick = () => document.body.classList.toggle("dark");'),
+            patch('index.html', '<button id="theme">', '<button id="theme" type="button">')
+          ]);
+        case 5: return action([read]);
+        case 6: return action([read]);
+        default:
+          assert.equal(kind, 'project-edit');
+          assert.match(prompt, /Recent saved changes: .*PATCH_FILE/);
+          return action([], true);
+      }
+    }
+  });
+  env.chat.messages[0].content = create;
+  await env.coding.run(create);
+  const first = env.chat.messages.at(-1);
+  assert.match(first.projectTaskError, /Last action: LIST_FILES.*Already attempted/);
+  assert.equal(first.codingArtifact.draft, true);
+
+  env.chat.messages.push({role:'user', content:edit});
+  assert.equal(env.coding.shouldRun(edit), true);
+  await env.coding.run(edit);
+  const second = env.chat.messages.at(-1);
+  assert.equal(second.scratchRunId, first.scratchRunId);
+  assert.equal(second.projectTaskError, undefined, second.content);
+  assert.equal(second.codingArtifact.draft, false);
+  assert.notEqual(second.codingArtifact.id, first.codingArtifact.id);
+  assert.equal(env.checks(), 1);
+  const {unzipSync} = require('fflate');
+  const unzip = async artifact => unzipSync(await env.store.readCodingArtifact(artifact.id, artifact.filename));
+  const original = await unzip(first.codingArtifact);
+  const updated = await unzip(second.codingArtifact);
+  assert.equal(Buffer.from(original['index.html']).toString(), files['index.html']);
+  assert.match(Buffer.from(updated['index.html']).toString(), /<button id="theme" type="button">Dark mode<\/button>/);
+  assert.match(Buffer.from(updated['style.css']).toString(), /body\.dark/);
+  assert.match(Buffer.from(updated['script.js']).toString(), /classList\.toggle\("dark"\)/);
 });
 
 test('an open-ended download saves a standalone HTML file without a separate model plan', async t => {

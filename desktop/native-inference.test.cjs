@@ -114,6 +114,7 @@ test('native requests are authenticated on loopback and stream real tokens withi
     const body = JSON.parse(init.body); assert.equal(body.max_tokens, 6000); assert.equal(body.stream, true);
     assert.equal(body.response_format?.type, expectedFormat?.type);
     assert.deepEqual(body.response_format?.schema?.required, expectedFormat?.required);
+    assert.deepEqual(body.response_format?.schema?.properties.commands?.items.properties.name.enum, expectedFormat?.editCommands);
     return new Response('data: {"choices":[{"delta":{"content":"Ready"}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
   }, events);
   const result = await runner.complete({ id: 'reply:live', lease: 'test-lease', max_tokens: 6000, messages: [{ role: 'user', content: 'Hello' }] });
@@ -123,6 +124,8 @@ test('native requests are authenticated on loopback and stream real tokens withi
   await runner.complete({ id: 'project:live', lease: 'test-lease', kind: 'project', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a JSON action' }] });
   expectedFormat = { type: 'json_object', required: ['commands','done'] };
   await runner.complete({ id: 'project:action', lease: 'test-lease', kind: 'project-action', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a workspace command' }] });
+  expectedFormat = { ...expectedFormat, editCommands: ['PATCH_FILE','WRITE_FILE','CREATE_FILE','APPEND_FILE','DELETE_FILE','MOVE_FILE'] };
+  await runner.complete({ id: 'project:edit', lease: 'test-lease', kind: 'project-edit', max_tokens: 6000, messages: [{ role: 'user', content: 'Edit from the source already read' }] });
   expectedFormat = { type: 'json_object', required: ['html'] };
   await runner.complete({ id: 'project:file', lease: 'test-lease', kind: 'project-html', max_tokens: 6000, messages: [{ role: 'user', content: 'Return a standalone page' }] });
   await assert.rejects(runner.complete({ id: 'reply:stale', lease: 'old', messages: [{ role: 'user', content: 'Hello' }] }), /loaded again/);

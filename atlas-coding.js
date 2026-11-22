@@ -439,6 +439,10 @@
       return {name,result:encoded.length>limit?{summary:encoded.slice(0,limit),truncated:true}:result};
     }));
   }
+  function actionSignature({ name, args }) {
+    const fields = Object.keys(args).sort().map(key => [key, args[key]]);
+    return JSON.stringify([name, fields]);
+  }
   function projectChatContext(projectId, currentChatId, request = '') {
     const chats=projectChats(projectId).filter(chat=>chat.id!==currentChatId)
       .sort((a,b)=>(b.updated||0)-(a.updated||0)).slice(0,30);
@@ -528,56 +532,74 @@
     const context = await command('SELECT_CONTEXT', { request: request + ' ' + failure.slice(0,500), budget: 1800 });
     await stage('Context', 'Using the project brief and recent project work. Relevant file excerpts: '+(context.files.map(file=>file.path).join(', ')||'none selected')+'.');
     for (const f of context.files) active.hashes.set(f.path,f.hash);
-    let evidence = contextData(context);
-    let progress = '', repeated = 0, lastSignature = '';
+    let sourceEvidence = contextData(context).slice(0, 2000);
+    let evidence = '', progress = '', recovery = '', stalled = 0, focusEdit = false;
     const recentActions = [], createdFiles = new Map();
-    const seenActions = new Set();
+    const recentReads = [];
+    const actionsAtCurrentSource = new Set();
     for (;;) {
       stopped();
-      const prompt = 'Project task: ' + request + '\nCanonical architecture and plan: ' + JSON.stringify(plan).slice(0,1800) +
+      const prompt = 'Project task: ' + request + '\nWorkspace action feedback: ' + recovery +
+        '\nCanonical architecture and plan: ' + JSON.stringify(plan).slice(0,1800) +
         '\nSaved workspace notes: ' + JSON.stringify(context.memory||{}).slice(0,800) +
-        '\nWorkspace revision: ' + active.revision + '\nRecent saved changes: ' + JSON.stringify(recentActions) +
+        '\nWorkspace revision: ' + active.revision + '\nProject file index: ' + projectFileIndex(active.fileIndex || [], 20) +
+        '\nRecent saved changes: ' + JSON.stringify(recentActions) +
         '\nProgress and next step from the last response: ' + progress +
         '\nFiles started in this pass (path and exact current ending): ' +
         JSON.stringify([...createdFiles].slice(-3).map(([path, file]) => ({path, tail:file.tail}))) +
-        '\nLatest workspace evidence: ' + evidence.slice(0,2200) + '\nFailure evidence: ' + failure.slice(0,1000) +
+        '\nLatest workspace results: ' + evidence.slice(0,2000) +
+        '\nSource excerpts: ' + sourceEvidence +
+        '\nFailure evidence: ' + failure.slice(0,1000) +
         '\nReturn a JSON object with a commands array, a boolean done, and a short progress or summary string. Each command has a name and an args object. Only read files that exist. If no files exist, create the requested file directly. ' +
         'Commands: READ_FILE/READ_RANGE(path,start,end), SEARCH_FILES(query), SEARCH_CHATS(query), LIST_FILES, GET_DEPENDENCIES(path), GET_DEPENDENTS(path), ' +
         'CREATE_FILE(path,content), PATCH_FILE(path,search,replace), WRITE_FILE(path,content), DELETE_FILE(path), MOVE_FILE(path,to), SET_PROJECT_MEMORY(memory). ' +
         'Return 1–4 commands. For a large new file, start it with CREATE_FILE, return done:false and "progress" with what remains, then use APPEND_FILE(path,content) for the next chunk of that file. Append only new source; do not repeat the saved ending or close incomplete structures early. Return a short progress note after each unfinished step. ' +
-        'Set done:true and include a short summary only after all code is complete. Reads are bounded; request needed ranges. Use PATCH_FILE for existing files. WRITE_FILE requires a complete prior read. Preserve existing interfaces. Use LIST_FILES, READ_RANGE and SEARCH_CHATS to recover detail as needed. ' +
+        'The file index already lists existing files. Use the source excerpts to edit directly when they include an exact, unique PATCH_FILE anchor. If you need more code, read one specific file or range and use the result in your next action. Preserve existing interfaces. WRITE_FILE requires a complete prior read. ' +
+        'Set done:true with the final write or with an empty commands array after the requested edits are saved. Atlas runs checks after done. A successful read alone does not complete an edit. ' +
         (active.temporary ? 'Deliver self-contained requests in one runnable file when practical. Respect the requested filename and include brief usage instructions in that file. Use separate source files, assets, or tests when the task needs them. ' :
           'Create real tests and run instructions. Web needs project.tests.json: {"tests":[{"name":"click works","steps":[{"action":"click","selector":"#button"},{"action":"assert","selector":"#result","property":"text","equals":"expected"}]}]}. ') +
         'Use standard libraries where possible. No fake binary assets, placeholders, or claims of execution. ' +
         (window.AtlasInlineUI?.designGuidance ? 'For visual interfaces only: ' + window.AtlasInlineUI.designGuidance : '');
-      const details = '\nProject file index: ' + projectFileIndex(active.fileIndex||[]) +
-        '\nRecent messages in this chat: ' + currentChatContext(active.chat.id) +
+      const details = '\nRecent messages in this chat: ' + currentChatContext(active.chat.id) +
         '\nRelevant discussions: ' + projectChatContext(active.id,active.chat.id,request) +
         '\nEarlier project tasks: ' + active.taskHistory + '\nDocs: ' + refs.slice(0,300);
-      const response = await completeJSON(prompt, active.limitGeneration ? 2000 : 4600, details, {
-        kind: 'project-action', chunked: true,
+      const editPrompt = 'Project task: ' + request +
+        '\nUse the source already read to finish the requested changes.' +
+        '\nWorkspace action feedback: ' + evidence +
+        '\nProject file index: ' + projectFileIndex(active.fileIndex || [], 20) +
+        '\nRecent saved changes: ' + JSON.stringify(recentActions) +
+        '\nSource excerpts: ' + sourceEvidence +
+        '\nCheck failure (if any): ' + failure.slice(0, 1000) +
+        '\nReturn {"commands":[{"name":"PATCH_FILE","args":{"path":"file","search":"exact unique text","replace":"updated text"}}],"done":true,"summary":"short description"}. ' +
+        'Use up to four edits. Prefer PATCH_FILE with a short exact anchor copied from the source, or use WRITE_FILE(path,content) when the entire file was read. ' +
+        'Keep existing content and structure. For interactive changes, trace the control, handler, state and visible result together. ' +
+        'Set done:true with the final edits. Use done:false and name the remaining edit only if more work is needed. ' +
+        (active.mutations > beforeMutations ? 'If the saved changes already fulfill the request, return {"commands":[],"done":true,"summary":"short description"}.' : '');
+      const response = await completeJSON(focusEdit ? editPrompt : prompt, active.limitGeneration ? 2000 : 4600, focusEdit ? '' : details, {
+        kind: focusEdit ? 'project-edit' : 'project-action', chunked: true,
         valid: ({ commands, done }) => (done === true && (commands === undefined || (Array.isArray(commands) && commands.length === 0))) ||
           (Array.isArray(commands) && commands.length >= 1 && commands.length <= 4 && commands.every(tool =>
             tool && (READ_TOOLS.includes(tool.name) || WRITE_TOOLS.includes(tool.name)) &&
             tool.args && typeof tool.args === 'object' && !Array.isArray(tool.args)))
       });
-      if (response.done && (!response.commands || !response.commands.length)) {
-        if(active.mutations===beforeMutations)throw new Error('Atlas did not change the project files. The task remains incomplete.');
-        return codingSummary(response.summary);
-      }
-      const signature = JSON.stringify(response.commands);
-      if (signature === lastSignature || seenActions.has(signature)) repeated++;
-      if (repeated >= 3) {
-        throw new Error('Atlas repeated the same workspace actions without making progress. Saved files were kept.');
-      }
-      const sameAction = signature === lastSignature;
-      lastSignature = signature;
-      if (seenActions.size >= 16) seenActions.delete(seenActions.values().next().value);
-      seenActions.add(signature);
       const results = [];
-      for (const tool of response.commands) {
+      const mutationsAtStart = active.mutations;
+      let repeatedRead = false;
+      for (const tool of response.commands || []) {
         stopped();
+        if (focusEdit && READ_TOOLS.includes(tool.name)) {
+          results.push({name: tool.name, error: 'Use an edit command with the source already provided.'});
+          continue;
+        }
+        const signature = actionSignature(tool);
+        if (actionsAtCurrentSource.has(signature)) {
+          repeatedRead ||= READ_TOOLS.includes(tool.name);
+          results.push({name: tool.name, error: 'Already attempted on the current files. Use the result or choose a different action.'});
+          continue;
+        }
+        actionsAtCurrentSource.add(signature);
         const args = {...tool.args};
+        const previousSourceHash = active.sourceHash;
         if (WRITE_TOOLS.includes(tool.name)) {
           args.baseRevision = active.revision;
           if (active.hashes.has(args.path)) args.baseHash = active.hashes.get(args.path);
@@ -590,17 +612,20 @@
             if (!startedFile) throw new Error('Append only to a file created in this pass. Use a targeted patch for existing files.');
             args.baseHash = startedFile.hash;
           }
-          const previousRevision = active.revision;
           const result = await command(tool.name,args); results.push({name:tool.name,result});
           if (READ_TOOLS.includes(tool.name)) await stage('Inspecting', tool.name.replaceAll('_',' ').toLowerCase() + (args.path ? ' · ' + args.path : args.query ? ' · ' + String(args.query).slice(0,100) : ''));
-          else await stage('Updated', tool.name.replaceAll('_',' ').toLowerCase() + (args.path ? ' · ' + args.path : ''));
-          if (WRITE_TOOLS.includes(tool.name) && active.revision !== previousRevision) {
+          if (result.sourceHash && result.sourceHash !== previousSourceHash) {
+            active.sourceHash = result.sourceHash;
             active.mutations++;
-            active.hashes.delete(args.path);
-            active.completeReads.delete(args.path);
+            actionsAtCurrentSource.clear();
+            sourceEvidence = '';
+            recentReads.length = 0;
             const latest = await bridge.read(active.id);
             active.fileIndex = latest.files || active.fileIndex;
             const savedFile = active.fileIndex.find(file => file.path === args.path);
+            if (savedFile) active.hashes.set(args.path, savedFile.hash);
+            else active.hashes.delete(args.path);
+            active.completeReads.delete(args.path);
             if (savedFile && !savedFile.binary && (tool.name === 'CREATE_FILE' || tool.name === 'APPEND_FILE')) {
               const tail = ((tool.name === 'APPEND_FILE' ? startedFile.tail : '') + args.content).slice(-600);
               createdFiles.delete(args.path);
@@ -610,22 +635,46 @@
             }
             recentActions.push([tool.name, String(args.path || '').slice(0,160)]);
             if (recentActions.length > 10) recentActions.shift();
-            seenActions.clear();
-            if (!sameAction) repeated = 0;
             refresh(latest);
             touchProjectChats(active.id);
+            await stage('Updated', tool.name.replaceAll('_', ' ').toLowerCase() + ' · ' + args.path);
+          } else if (result.sourceHash) {
+            results.at(-1).error = 'The file contents did not change. Check the current source and apply the remaining edit.';
           }
         } catch(e) {
           if (/CONFLICT|BUDGET|BUSY/.test(e.message)) throw e;
           results.push({name:tool.name,error:e.message}); await stage('Needs attention', tool.name + ' · ' + e.message);
         }
       }
-      evidence = 'Revision '+active.revision+'\n'+resultData(results);
+      const reads = results.filter(({result}) => result?.content !== undefined || result?.matches?.length);
+      if (reads.length) {
+        recentReads.unshift(...reads);
+        recentReads.splice(3);
+        sourceEvidence = resultData(recentReads).slice(0, 2000);
+      }
+      const errors = results.filter(result => result.error);
+      const otherResults = [...errors, ...results.filter(result => !result.error && !reads.includes(result))];
+      evidence = otherResults.length ? resultData(otherResults).slice(0, 2000) : '';
       if (results.every(result => !result.error)) progress = codingSummary(response.progress) || progress;
-      if (response.done && results.every(r=>!r.error)) {
-        if(active.mutations===beforeMutations)throw new Error('Atlas did not change the project files. The task remains incomplete.');
+      if (response.done && !errors.length && active.mutations > beforeMutations) {
         return codingSummary(response.summary);
       }
+      if (active.mutations > mutationsAtStart) stalled = 0;
+      else if (errors.length || response.done) stalled++;
+      focusEdit = repeatedRead && recentReads.length > 0;
+      recovery = errors.length || response.done
+        ? (errors.length ? 'Some actions failed or were repeated. Use the feedback below and choose a different action. ' : 'No source edits have been saved for this pass. ') +
+          (active.mutations > beforeMutations
+            ? 'If the requested change is complete, return done:true with an empty commands array so Atlas can verify it.'
+            : 'Apply a targeted edit using the available source, or read a specific missing range once before editing.')
+        : '';
+      if (stalled >= 3) {
+        const lastError = errors.at(-1);
+        throw new Error('Atlas could not finish the requested edits after retrying.' +
+          (lastError ? ' Last action: ' + lastError.name + ' · ' + lastError.error : ' The model stopped without saving a source change.') +
+          ' Saved files were kept.');
+      }
+      if (recovery) await stage('Recovering', 'Using the workspace results to find the next edit.');
     }
   }
   async function run(request, existingMessage = null, forceCoder = false, verificationOnly = false, showPreview = false, chatId = null) {
@@ -659,6 +708,7 @@
       if(!projectId&&!runData)runData=await bridge.createScratch({title:request.slice(0,80),runtime:/\bpython\b/i.test(request)?'python':'web',entrypoint:/\bpython\b/i.test(request)?'main.py':'index.html'});
       active.temporary=!projectId;active.id = runData.id; active.revision = runData.revision;
       previousSourceHash = runData.sourceHash;
+      active.sourceHash = previousSourceHash;
       if(active.temporary){active.chat.scratchWorkspaceId=runData.id;message.scratchRunId=runData.id;delete message.projectRunId;}
       else{active.chat.projectId=runData.id;message.projectRunId=runData.id;}
       active.taskHistory=projectTaskContext(runData,request,650);
@@ -738,7 +788,14 @@
         try { result = await bridge.check(active.id); }
         finally { clearInterval(poll); }
         stopped();
-        refresh(await bridge.read(active.id));
+        const checkedWorkspace = await bridge.read(active.id);
+        if (checkedWorkspace.sourceHash !== active.sourceHash) {
+          active.sourceHash = checkedWorkspace.sourceHash;
+          active.fileIndex = checkedWorkspace.files || [];
+          active.hashes.clear();
+          active.completeReads.clear();
+        }
+        refresh(checkedWorkspace);
         if (result.passed || !result.executed || result.cancelled) break;
         const errors=result.checks.filter(c=>c.exitCode!==0).map(c=>({command:c.command,output:c.output}));
         if(!errors.length&&result.reason)errors.push({command:'Verification',output:result.reason});
