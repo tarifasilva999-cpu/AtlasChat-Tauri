@@ -1307,3 +1307,24 @@ html[data-theme="light"] :is(#settingsModal,#memoryModal,#infoModal,#installModa
     transition:background-color 100ms ease,color 100ms ease,opacity 100ms ease,scale 80ms ease-out;
   }
 }
+
+.atlas-ui-shell--custom{max-width:100%}
+.thread:has(.atlas-ui-shell--custom){width:min(1200px,100%)}
+.atlas-ui-shell,.atlas-html-preview{position:relative}
+.atlas-resize-handle{position:absolute;right:0;bottom:0;width:28px;height:28px;padding:0;border:0;border-radius:4px;background:var(--surface-2);color:var(--text-2);cursor:nwse-resize;touch-action:none;opacity:0}
+.atlas-resize-handle::after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor}
+.atlas-ui-shell:has(.atlas-resize-handle):is(:hover,:focus-within,.atlas-resizing){outline:1px solid var(--line);outline-offset:1px}
+.atlas-ui-shell:is(:hover,:focus-within,.atlas-resizing)>.atlas-resize-handle,.atlas-html-preview>.atlas-resize-handle{opacity:1}
+.atlas-resize-handle:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.atlas-html-preview{position:fixed;inset:5vh auto auto max(12px,calc((100vw - 950px)/2));margin:0;width:min(950px,calc(100vw - 24px));height:min(700px,calc(95vh - 12px));max-width:calc(100vw - max(12px,calc((100vw - 950px)/2)) - 12px);max-height:calc(95vh - 12px);padding:0;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text)}
+.atlas-html-preview[open]{display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+.atlas-html-preview::backdrop{background:#0009}
+.atlas-html-preview>header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.atlas-html-preview h2{font:600 14px var(--sans,system-ui);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
+.atlas-html-preview>header button{padding:6px 9px;border:1px solid var(--line);border-radius:6px;color:var(--text);background:var(--surface-2)}
+.atlas-html-preview>iframe{display:block;border:0;width:100%;height:100%;background:white}
+.atlas-preview-error{margin:0;padding:7px 12px;max-height:7em;overflow:auto;color:var(--error,var(--text));font-size:13px;overflow-wrap:anywhere}
+.atlas-preview-error:empty{display:none}
+.atlas-html-preview>iframe{grid-row:3}
+.file-card:has(.atlas-file-preview-button){flex-wrap:wrap}
+@media(hover:none){.atlas-ui-shell>.atlas-resize-handle{opacity:1}}

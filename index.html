@@ -2522,6 +2522,7 @@
 
   function isFileRequest(text){
     const source=String(text||"").trim();
+    if(window.AtlasInlineUI.wantsArchive(source))return true;
     if(/\b(?:how|what|why)\b.{0,80}\b(?:create|make|generate|write|save|download|export|convert)\b/i.test(source))return false;
     return /\b(create|make|generate|write|save|download|export|convert)\b/i.test(source)&&/\b(file|document|spreadsheet|workbook|csv|json|markdown|readme|pdf|docx|xlsx|pptx|html file|text file)\b/i.test(source);
   }
@@ -2562,7 +2563,10 @@
     if(!mime){download.disabled=true;download.title="Atlas currently creates text-based files.";}
     else download.onclick=()=>downloadGeneratedText(safeName,contents);
     if(state.pendingEl&&(state.pendingEl.response===container||state.pendingEl.content===container)){download.disabled=true;download.title="Available when the reply is complete.";}
-    card.append(icon,details,download);wrapper.appendChild(card);
+    const preview=window.AtlasInlineUI.htmlPreviewButton(safeName,()=>contents);
+    card.append(icon,details);
+    if(preview){preview.disabled=Boolean(state.pendingEl&&(state.pendingEl.response===container||state.pendingEl.content===container));card.append(preview);}
+    card.append(download);wrapper.appendChild(card);
   }
 
   function renderAssistantMarkdown(container,raw,createFiles=false,request="",codeContinuation=false){
@@ -2572,7 +2576,8 @@
 
     const text=String(raw||"");
     const allowVisual=!createFiles&&!codeContinuation&&!isCodeRequest(request)&&!isFileRequest(request);
-    if(allowVisual&&window.AtlasInlineUI.tryRawMarkup(wrapper,text,{markdown:markdownSegmentToHtml})){
+    const requestedVisual=allowVisual&&window.AtlasInlineUI.wantsVisual(request);
+    if(allowVisual&&window.AtlasInlineUI.tryRawMarkup(wrapper,text,{markdown:markdownSegmentToHtml,interactive:requestedVisual})){
       container.appendChild(wrapper);return;
     }
     const fence=/```(file:[^\s\x60]+|[A-Za-z0-9_+#.-]*)[ \t]*\r?\n?/g;
@@ -2604,6 +2609,10 @@
           notice.textContent=end?"Inline visual unavailable.":"Inline visual was incomplete.";
           wrapper.appendChild(notice);
         }
+        continue;
+      }
+      if(requestedVisual&&!fileName&&/^(?:html|svg|css|js|javascript|code)$/i.test(language)){
+        if(!end||!window.AtlasInlineUI.tryRawMarkup(wrapper,code,{markdown:markdownSegmentToHtml,interactive:true}))window.AtlasInlineUI.appendUnavailable(wrapper);
         continue;
       }
       if(allowVisual&&/^(html|svg)$/i.test(language)&&isPlanCandidate(request)&&/<(?:style|article|section|svg)\b/i.test(code)&&
@@ -2699,6 +2708,7 @@
   function isCodeRequest(text){
     const source=String(text||"");
     if(window.AtlasInlineUI.wantsVisual(source))return false;
+    if(window.AtlasInlineUI.wantsStandalone(source))return true;
     const asksToWrite=/\b(write|generate|build|create|make|implement|fix|debug|refactor|update|add)\b/i.test(source);
     if(/\b(explain|what|why|how)\b/i.test(source)&&!asksToWrite)return false;
     if(/\b(poem|story|essay|email|lyrics)\b/i.test(source)&&
@@ -2779,6 +2789,7 @@
 
   function detectCodeContinuation(chat,text){
     const source=String(text||"").trim();
+    if(window.AtlasInlineUI.wantsVisual(source))return null;
     const editIntent=/\b(?:add|make|change|modify|update|improve|enhance|fix|debug|refactor|remove|include|support|extend|adjust|replace|rewrite|expand|increase|decrease|switch|turn)\b/i.test(source);
     const refersToCode=/\b(?:it|this|that|these|those|above|previous|same|existing|current|snippet|code|script|program|version)\b/i.test(source);
     const codeSpecific=/\b(?:button|keybinds?|keyboard|particles?|effects?|animation|canvas|mouse|cursor|corners?|colors?|controls?|reset|speed|count|features?|function|class|input|output|shader)\b/i.test(source);
@@ -3486,7 +3497,11 @@
     if(codeContinuation)return "CODE CONTINUATION: The latest request modifies the code from the immediately preceding assistant response. Treat that previous complete code block as the source of truth. Implement every requested change and return the FULL updated solution in one fenced block using the same language as the previous code. Preserve existing behavior unless the user asks to change it. Add only a brief factual summary after the code. Do not answer with a plan, diff-only patch, mockup, inline visual, `atlas-ui`, or `atlas-plan`. Never emit tool-call tokens, `CodeEdit` or `CodeInterpreter` calls, JSON tool arguments, `file_path`/`old_string`/`new_string` patch envelopes, or claims that a file was changed. No code-edit tool is available in this reply; return the complete source snippet only. If the previous code is missing from the supplied conversation context, ask the user to paste it instead of inventing a replacement."+
       (isFileRequest(t)?" If a downloadable file is requested, use one complete `file:filename.ext` block with the updated code.":"");
 
+    if(window.AtlasInlineUI.wantsArchive(t))return "ARCHIVE REQUEST: Use the project archive workflow when available. In this chat reply, explain that direct ZIP creation is unavailable and offer the complete project as separate downloadable source files. Do not emit a pretend ZIP or an inline visual.";
+
     if(isFileRequest(t))return "FILE OUTPUT: Create the requested downloadable file, not just a code example. Put each complete file in its own fenced block beginning exactly with ```file:filename.ext and ending with ```; put only that file's contents inside. Choose a clear filename and a text-based format such as TXT, Markdown, HTML, CSS, JavaScript, TypeScript, Python, JSON, CSV, YAML, or SVG. Avoid triple-backtick fences inside file contents (use tildes in Markdown files). For PDF, DOCX, XLSX, or other binary formats, explain that Atlas cannot export that format yet and offer a text-based alternative. Never claim the file was tested or executed.";
+
+    if(window.AtlasInlineUI.wantsVisual(t))return "INTERACTIVE REPLY: Render the requested planner or visual inside Atlas. Use exactly one atlas-ui fenced block with semantic HTML, CSS, and plain JavaScript when interaction is needed. Do not output raw markup or ordinary HTML, CSS, or JavaScript code fences. Use addEventListener for controls, read input values from event.currentTarget.value, and verify the script syntax. Keep the visual compact and size it to its contents.";
 
     if(isPlanCandidate(t)&&!isCodeRequest(t)&&!asksCurrent){
       return "PLAN: Keep the answer mostly concise, natural prose, with one small `atlas-ui` visual between related paragraphs when a visual helps. Choose a layout that fits this plan; include only useful sections. Ask one focused question if an essential detail is missing. Do not add an `Atlas Status` section. Never claim Atlas is searching, checking live local options, contacting anyone, booking, or taking action unless a connected tool actually did it.";
@@ -3533,6 +3548,7 @@
       : "";
 
     const task=taskInstruction(latest,codeContinuation);
+    const designGuidance=isCodeRequest(latest)||isFileRequest(latest)?"\n\nFor visual interfaces only: "+window.AtlasInlineUI.designGuidance:"";
     const visualGuidance=!codeContinuation&&!isCodeRequest(latest)&&!isFileRequest(latest)?window.AtlasInlineUI.instructions:"";
     const hasAttachedFiles=chat.messages.some(message=>message.role==="user"&&Array.isArray(message.attachments)&&message.attachments.length);
     const fileGuidance=hasAttachedFiles
@@ -3561,7 +3577,7 @@ For a nontrivial, multi-step response, emit one brief progress summary before th
 
  Effort setting: ${effort}. ${EFFORT_GUIDANCE[effort]||EFFORT_GUIDANCE.medium}
 
-${task}${visualGuidance}${fileGuidance}${projectGuidance}
+${task}${visualGuidance}${designGuidance}${fileGuidance}${projectGuidance}
 
 Local date/time: ${current}.${global}${local}`
     },...context.recent];

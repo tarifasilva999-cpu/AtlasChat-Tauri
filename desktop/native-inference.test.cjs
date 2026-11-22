@@ -181,8 +181,9 @@ test('native adapter retries a code description and returns the corrected final 
     isPlanCandidate: () => false, isCodeRequest: () => true, hasUsableCodeResponse: text => text.includes('<html>'), choice: 'apex-ultra' });
   adapter.onmessage = ({ data }) => events.push(data);
   await adapter._load();
-  await adapter._generate({ id: 'reply:code', mode: 'code', messages: [{ role: 'system', content: 'Instructions' }, { role: 'user', content: 'Make HTML' }] });
+  await adapter._generate({ id: 'reply:code', mode: 'code', messages: [{ role: 'system', content: 'Instructions' }, { role: 'user', content: 'Make HTML and preserve keyboard support' }, { role: 'assistant', content: 'Previous implementation' }, { role: 'user', content: 'Add a heading' }] });
   assert.equal(requests.length, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(requests[1].messages.slice(1))), JSON.parse(JSON.stringify(requests[0].messages.slice(1))));
   assert.ok(events.some(event => event.type === 'done' && event.text === '<html><body>Hello</body></html>'));
   await adapter._dispose();
 });

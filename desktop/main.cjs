@@ -158,6 +158,12 @@ app.whenReady().then(async () => {
     if(['BUILD','RUN','RUN_TESTS','RUN_BROWSER_TEST'].includes(value.name))return execute(id);
     if(value.name==='EXPORT_ZIP')return exportProject(id);
     if(value.name==='SAVE_CODING_ARTIFACT')return store.saveCodingArtifact(id,value.args?.previousSourceHash,value.args?.sourceHash);
+    if(value.name==='READ_HTML_CODING_ARTIFACT'){
+      const filename=String(value.args?.filename||'');
+      if(!/\.html?$/i.test(filename))throw new Error('Only HTML files can be previewed.');
+      const data=await store.readCodingArtifact(id,filename);
+      return data.toString('utf8');
+    }
     if(value.name==='DOWNLOAD_CODING_ARTIFACT'){
       const filename=value.args?.filename;
       const data=await store.readCodingArtifact(id,filename);

@@ -130,6 +130,8 @@
     if (/\b(?:show|give|paste|write|return)\b.{0,35}\b(?:the code|inline code|code inline|code block|snippet)\b/i.test(text) ||
         /\b(?:as|in)\s+(?:a\s+)?(?:snippet|code block)\b/i.test(text) ||
         /^\s*(?:explain|what|why|how (?:does|do|can|would|to))\b/i.test(text)) return false;
+    if (window.AtlasInlineUI?.wantsArchive(text)) return true;
+    if (window.AtlasInlineUI?.wantsVisual(text)) return false;
     const hasScratch = !projectIdForChat(chat) &&
       (chat?.scratchWorkspaceId || chat?.messages?.some(message => message.scratchRunId));
     if (hasScratch && (codeContinuation || change || failure || fileChange)) return true;
@@ -546,7 +548,8 @@
         'Set done:true and include a short summary only after all code is complete. Reads are bounded; request needed ranges. Use PATCH_FILE for existing files. WRITE_FILE requires a complete prior read. Preserve existing interfaces. Use LIST_FILES, READ_RANGE and SEARCH_CHATS to recover detail as needed. ' +
         (active.temporary ? 'Deliver self-contained requests in one runnable file when practical. Respect the requested filename and include brief usage instructions in that file. Use separate source files, assets, or tests when the task needs them. ' :
           'Create real tests and run instructions. Web needs project.tests.json: {"tests":[{"name":"click works","steps":[{"action":"click","selector":"#button"},{"action":"assert","selector":"#result","property":"text","equals":"expected"}]}]}. ') +
-        'Use standard libraries where possible. No fake binary assets, placeholders, or claims of execution.';
+        'Use standard libraries where possible. No fake binary assets, placeholders, or claims of execution. ' +
+        (window.AtlasInlineUI?.designGuidance ? 'For visual interfaces only: ' + window.AtlasInlineUI.designGuidance : '');
       const details = '\nProject file index: ' + projectFileIndex(active.fileIndex||[]) +
         '\nRecent messages in this chat: ' + currentChatContext(active.chat.id) +
         '\nRelevant discussions: ' + projectChatContext(active.id,active.chat.id,request) +
@@ -1576,7 +1579,11 @@
           download.disabled = false;
         }
       };
-      card.append(icon, details, download);
+      const preview = bridge && window.AtlasInlineUI?.htmlPreviewButton(artifact.filename, () =>
+        bridge.projectCommand({id:artifact.id,name:'READ_HTML_CODING_ARTIFACT',args:{filename:artifact.filename}}));
+      card.append(icon, details);
+      if(preview)card.append(preview);
+      card.append(download);
       container.append(card);
       return;
     }

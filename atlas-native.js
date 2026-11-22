@@ -180,10 +180,14 @@
           if (!full.trim() && !this.interrupted) throw new Error('Apex returned an empty response.');
           if (!this.interrupted && kind === 'code' && hasUsableCodeResponse && !hasUsableCodeResponse(full, latest)) {
             this._emit({ type: 'reply-phase', id: message.id, message: 'Fixing the code response…' });
-            const retry = await engine.chat.completions.create({ messages: [
-              { role: 'system', content: 'Return complete, runnable code that fulfills the request, in a fenced code block. Do not substitute a description, pseudocode, or placeholders for code.' },
-              { role: 'user', content: latest }
-            ], max_tokens: message.maxNewTokens || 2048, temperature: 0.2, _atlasKind: 'code' });
+            const retryDirective = 'The first draft did not contain usable code. Return the full corrected snippet in the requested language. Preserve the original requirements and any code or constraints from earlier messages. Check syntax, imports, and that the requested behavior is implemented.';
+            const messages = message.messages.map((entry, index) => index === 0 && entry.role === 'system'
+              ? { ...entry, content: entry.content + '\n\n' + retryDirective }
+              : entry);
+            if (messages[0]?.role !== 'system') messages.unshift({ role: 'system', content: retryDirective });
+            const retry = await engine.chat.completions.create({ messages,
+              max_tokens: message.maxNewTokens || 2048, temperature: 0.15, _atlasKind: 'code' });
+            finishReason = retry.choices?.[0]?.finish_reason;
             if (epoch !== this.generationEpoch) return;
             const corrected = String(retry.choices?.[0]?.message?.content || '').trim();
             if (!hasUsableCodeResponse(corrected, latest)) throw new Error('Atlas could not produce usable code for this request. Try again or break the task into smaller parts.');
