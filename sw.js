@@ -1,4 +1,4 @@
-const CACHE = "atlas-chat-native-desktop-v24";
+const CACHE = "atlas-chat-native-desktop-v25";
 const SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const SHELL = [
   "./atlas-inline-ui.js",
   "./atlas-native.js",
   "./atlas-coding.js",
+  "./atlas-web-search.js",
   "./atlas-poem3.js",
   "./atlas-files.js",
   "./fonts/AtlasText-Regular.ttf",

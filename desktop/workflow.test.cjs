@@ -193,10 +193,16 @@ test('follow-up chat reuses the canonical workspace and stops repeated repair ev
   env.chat.messages.push({role:'user',content:'Make output brighter'});
   assert.equal(env.coding.shouldRun('Make output brighter'),true);
   assert.equal(env.coding.shouldRun('Yes, go ahead'),true);
-  await env.coding.run('Change text color');
+  assert.equal(env.coding.shouldRun('lets begin working on this project'),true);
+  assert.equal(env.coding.shouldRun('Let’s get started on this project.'),true);
+  assert.equal(env.coding.shouldRun('lets begin working on this project',{messages:[]}),false);
+  assert.equal(env.coding.shouldRun('How do we start working on this project?'),false);
+  assert.equal(env.coding.shouldRun("Let's brainstorm before editing this project."),false);
+  await env.coding.run('lets begin working on this project');
   assert.equal(env.chat.projectId,id);
   assert.equal((await env.store.ids()).length,1);
   assert.equal((await env.store.read(id)).tasks.length,2);
+  assert.equal((await env.store.read(id)).tasks.at(-1).request,'lets begin working on this project');
 });
 test('a busy project rejection does not finish or overwrite another chat task',async t=>{
   const env=await workspace(t,async()=>({passed:true,executed:true,checks:[]}),{persistent:false});
@@ -290,6 +296,7 @@ test('a portfolio follow-up recovers repeated reads and exports a new ZIP', asyn
         return action([{name:'LIST_FILES', args:{}}]);
       }
       assert.ok(prompt.startsWith('Project task: ' + edit));
+      assert.match(prompt, /project\.tests\.json/);
       const fileIndex = JSON.parse(prompt.match(/^Project file index: (.+)$/m)[1]);
       assert.deepEqual(fileIndex.paths.sort(), Object.keys(files).sort());
       switch (editCalls++) {
@@ -298,10 +305,10 @@ test('a portfolio follow-up recovers repeated reads and exports a new ZIP', asyn
           assert.match(prompt, /No source edits have been saved/);
           return action([read]);
         case 2: return action([{name:'READ_FILE', args:{path:'style.css'}}]);
-        case 3: return action([read]);
+        case 3: return action([{name:'READ_RANGE', args:{path:'index.html', start:1, end:15}}]);
         case 4:
           assert.equal(kind, 'project-edit');
-          assert.match(prompt, /Already attempted on the current files/);
+          assert.match(prompt, /This range returned source already provided/);
           assert.match(prompt, /<h1>Portfolio<\/h1>/);
           assert.match(prompt, /body \{ color: black; \}/);
           return action([

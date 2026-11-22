@@ -14,7 +14,7 @@ async function main() {
   }
   const instructionBundle = `(() => {\n  const profiles = ${JSON.stringify(profiles)};\n  const get = choice => profiles[choice === 'ultra-code' ? 'ultra-code' : ['forge', 'firefly'].includes(choice) ? 'forge' : 'apex-ultra'];\n  window.AtlasModelInstructions = Object.freeze({ forChoice: choice => get(choice)?.prompt || '' });\n})();\n`;
   await fs.writeFile(path.join(ui, 'atlas-model-instructions.js'), instructionBundle);
-  for (const name of ['Atlas-CHAT.html','index.html','atlas-ui.css','atlas-updates.js','atlas-coding.js','atlas-inline-ui.js','atlas-native.js','atlas-poem3.js','atlas-files.js','atlas-mlc-worker.js','manifest.webmanifest','icons','fonts','vendor']) {
+  for (const name of ['Atlas-CHAT.html','index.html','atlas-ui.css','atlas-updates.js','atlas-coding.js','atlas-web-search.js','atlas-inline-ui.js','atlas-native.js','atlas-poem3.js','atlas-files.js','atlas-mlc-worker.js','manifest.webmanifest','icons','fonts','vendor']) {
     await fs.cp(path.join(root,name),path.join(ui,name),{recursive:true});
   }
   await esbuild.build({entryPoints:[path.join(root,'tauri/updater.js')],outfile:path.join(ui,'tauri-updater.js'),bundle:true,format:'iife',platform:'browser',target:'es2020',minify:true,legalComments:'none'});

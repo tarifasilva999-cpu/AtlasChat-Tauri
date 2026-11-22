@@ -10,6 +10,7 @@ const { bytes, text } = require('./project-audit.cjs');
 const { createPreview, scopedRead } = require('./preview.cjs');
 const {verifyProject,completionStatus}=require('./execution.cjs');
 const { NativeInference } = require('./native-inference.cjs');
+const { searchWeb } = require('./web-search.cjs');
 const ROOT = path.resolve(__dirname, '..');
 protocol.registerSchemesAsPrivileged([
   { scheme: 'atlas', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
@@ -72,7 +73,21 @@ function researchOrigin() {
 }
 let searchSession;
 const researchJobs = new Map();
+const chatSearches = new Map();
+async function chatSearch(value) {
+  const id = runId(value.id);
+  if (value.cancel === true) {
+    chatSearches.get(id)?.abort();
+    return true;
+  }
+  if (chatSearches.has(id) || chatSearches.size >= 2) throw new Error('Wait for the current web search to finish.');
+  const controller = new AbortController();
+  chatSearches.set(id, controller);
+  try { return await searchWeb(value.query, controller.signal); }
+  finally { chatSearches.delete(id); }
+}
 async function research(value) {
+  if (value?.scope === 'chat') return chatSearch(value);
   const origin = researchOrigin();
   if (!origin) throw new Error('Online research is not configured for this desktop build.');
   runId(value.id);
@@ -110,7 +125,7 @@ app.whenReady().then(async () => {
   protocol.handle('atlas', async request => {
     try {
       const url = new URL(request.url), relative = decodeURIComponent(url.pathname.slice(1)) || 'index.html';
-      if (url.hostname !== 'app' || !/^(?:(?:index\.html|Atlas-CHAT\.html|atlas-ui\.css|atlas-coding\.js|atlas-native\.js|atlas-inline-ui\.js|atlas-poem3\.js|atlas-files\.js|atlas-mlc-worker\.js|manifest\.webmanifest)$|fonts\/|icons\/|vendor\/)/.test(relative)) return new Response('', { status: 403 });
+      if (url.hostname !== 'app' || !/^(?:(?:index\.html|Atlas-CHAT\.html|atlas-ui\.css|atlas-coding\.js|atlas-web-search\.js|atlas-native\.js|atlas-inline-ui\.js|atlas-poem3\.js|atlas-files\.js|atlas-mlc-worker\.js|manifest\.webmanifest)$|fonts\/|icons\/|vendor\/)/.test(relative)) return new Response('', { status: 403 });
       return new Response(await scopedRead(ROOT, relative), { headers: {
         'Content-Type': MIME[path.extname(relative)] || 'application/octet-stream',
         'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://esm.run https://cdn.jsdelivr.net; worker-src 'self' blob:; connect-src 'self' https:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; frame-src 'self' blob:"

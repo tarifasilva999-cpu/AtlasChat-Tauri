@@ -374,6 +374,11 @@
       </section>
       <section class="settings-pane" id="settingsPaneAtlas" role="tabpanel" aria-labelledby="settingsTabAtlas" tabindex="0" hidden>
         <h3 class="settings-pane-title">App</h3>
+        <section class="settings-group" id="settingsWebSearch" aria-labelledby="settingsWebSearchTitle" hidden>
+          <h4 id="settingsWebSearchTitle">Web search</h4>
+          <label class="coding-pref-row atlas-search-setting"><input type="checkbox"> Search automatically for current information</label>
+          <p class="coding-settings-note">Use @Web search or /search for one reply. Atlas sends the search query to DuckDuckGo.</p>
+        </section>
         <section class="settings-group" aria-labelledby="settingsDataTitle">
           <h4 id="settingsDataTitle">Personal data</h4>
           <div class="settings-action-grid">
@@ -430,6 +435,7 @@
 <div class="mini-toast" id="miniToast" role="status"></div>
 
 <script src="./atlas-updates.js"></script>
+<script src="./atlas-web-search.js"></script>
 <script src="./atlas-coding.js"></script>
 <script src="./atlas-inline-ui.js"></script>
 <script src="./atlas-native.js"></script>
@@ -651,7 +657,8 @@
   }
 
   function messageContextContent(message,maxAttachmentChars=48000){
-    const base=String(message?.content||"");
+    const content=String(message?.content||"");
+    const base=message?.role==="assistant"?safeAssistantDraft(content,Boolean(message.codeContinuation)):content;
     const attachments=Array.isArray(message?.attachments)?message.attachments:[];
     if(!attachments.length)return base;
     let remaining=Math.max(0,Number(maxAttachmentChars)||0);
@@ -2717,6 +2724,9 @@
   }
 
   function pendingReplyPreview(text,request,codeContinuation=false){
+    if(window.AtlasInlineUI.hasUnsupportedToolCall(text,isCodeRequest(request)||codeContinuation)){
+      return {text:"",writingCode:false,writingVisual:false};
+    }
     const fence=text.indexOf("```");
     if(fence>=0){
       const writingVisual=!codeContinuation&&!isCodeRequest(request)&&!isFileRequest(request)&&/^```atlas-ui(?:-wide)?[ \t]*\r?\n/i.test(text.slice(fence));
@@ -2829,14 +2839,11 @@
     return !/^\s*(?:\.\.\.|TODO|your code here)\s*$/im.test(snippet);
   }
 
-  function containsUnsupportedToolCallSyntax(raw){
-    const text=String(raw||"");
-    return /<\|(?:tool_call|tool_result|tool_response)(?:\|)?>/i.test(text)||
-      /\bcall:(?:CodeEdit|CodeInterpreter)\s*\{/i.test(text)||
-      /\b(?:file_path|old_string|new_string)\s*:\s*<\|/i.test(text);
-  }
+  const INVALID_CODE_DRAFT_MESSAGE="Atlas could not apply the model’s edit. No project files were changed by this reply. Use Try again to retry.";
 
-  const INVALID_CODE_DRAFT_MESSAGE="Atlas emitted a fake CodeEdit command instead of an updated snippet. I discarded that draft; no code or files were changed. Please resend the request to try again.";
+  function safeAssistantDraft(text, codeTask=false){
+    return window.AtlasInlineUI.hasUnsupportedToolCall(text,codeTask)?INVALID_CODE_DRAFT_MESSAGE:text;
+  }
 
   function normalizeCodeResponse(raw,request,codeContinuation=false,languageOverride=""){
     const text=String(raw||"").trim();
@@ -3101,6 +3108,9 @@
   const arrivingUserMessages=new WeakSet();
 
   function addMessageEl(role,text="",thinking=false,message=null,request=""){
+    if(role==="assistant"&&!thinking&&message?.kind!=="coding-project"){
+      text=safeAssistantDraft(text,isCodeRequest(request)||Boolean(message?.codeContinuation));
+    }
     const root=document.createElement("div");
     root.className="message "+role;
     if(message?.id)root.dataset.messageId=message.id;
@@ -3131,6 +3141,7 @@
       content.append(thinkingResponse,thinkingStatus);
     }else if(role==="assistant"){
       renderAssistantMarkdown(content,codeReply?visibleCodeResponse(text):text,fileReply,request,codeContinuation);
+      window.AtlasWebSearch.render(content,message?.webSearch);
     }else{
       content.textContent=text;
       if(role==="user")appendMessageAttachments(content,message?.attachments);
@@ -3169,7 +3180,7 @@
       copy.innerHTML='<svg viewBox="0 0 24 24"><rect x="8" y="8" width="10" height="10" rx="2"/><path d="M15 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>';
       copy.onclick=()=>{
         if(role!=="assistant")return copyText(message.content,copy);
-        const payload=window.AtlasInlineUI.copyPayload(content,message.content);
+        const payload=window.AtlasInlineUI.copyPayload(content,text);
         return copyText(payload.text,copy,payload.html);
       };
       actions.appendChild(copy);
@@ -3452,7 +3463,7 @@
     return null;
   }
 
-  function contextMessages(chat=activeChat(),choice=state.modelChoice,effort=state.effort,projectContext=""){
+  function contextMessages(chat=activeChat(),choice=state.modelChoice,effort=state.effort,projectContext="",webSearch=null){
     const msgs=chat.messages;
     const out=[];
     let estimatedTokens=0;
@@ -3464,7 +3475,7 @@
     // Reserve room inside the selected model context for instructions, memory,
     // the running summary, and the response.
     const estimate=content=>Math.ceil(String(content).length/2.7)+8;
-    const systemCost=estimate(buildMessagesForChoice({recent:[]},chat,choice,effort,projectContext)[0].content)+
+    const systemCost=estimate(buildMessagesForChoice({recent:[],webSearch},chat,choice,effort,projectContext)[0].content)+
       Math.max(estimate(chat.contextSummary||""),estimate("x".repeat(1400)));
     const inputBudget=Math.max(0,contextWindowForChoice(choice,state.contextPreferences,effort)-generationBudget(latest,effort,codeContinuation)-40-systemCost-120);
     const latestAttachmentBudget=Math.max(0,Math.min(MAX_COMPOSER_TEXT_CHARS,Math.floor((inputBudget-estimate(latest)-220)*2.7)));
@@ -3487,7 +3498,7 @@
       });
     }
 
-    return {recent:out,start,tooLong:false};
+    return {recent:out,start,tooLong:false,webSearch};
   }
 
   function taskInstruction(text,codeContinuation=false){
@@ -3547,7 +3558,9 @@
       ? "\nThis chat remembers:\n- "+(planAware?chat.memory:chat.memory.slice(-6)).map(item=>String(item).slice(0,planAware?400:140)).join("\n- ")
       : "";
 
-    const task=taskInstruction(latest,codeContinuation);
+    const task=context.webSearch
+      ? "WEB SEARCH: Answer the user's question from available evidence. Use numbered citations where supported."+window.AtlasWebSearch.guidance(context.webSearch)
+      : taskInstruction(latest,codeContinuation);
     const designGuidance=isCodeRequest(latest)||isFileRequest(latest)?"\n\nFor visual interfaces only: "+window.AtlasInlineUI.designGuidance:"";
     const visualGuidance=!codeContinuation&&!isCodeRequest(latest)&&!isFileRequest(latest)?window.AtlasInlineUI.instructions:"";
     const hasAttachedFiles=chat.messages.some(message=>message.role==="user"&&Array.isArray(message.attachments)&&message.attachments.length);
@@ -3890,7 +3903,15 @@ Local date/time: ${current}.${global}${local}`
     catch(error){showToast("Project context could not be loaded: "+String(error.message||error));}
     if(secondaryJob!==job)return;
     if(job.cancelled){finishSecondaryJob(job,{stopped:true,text:"Stopped."});return;}
-    const context=contextMessages(c,job.choice,job.effort,projectContext);
+    const webRequest=window.AtlasWebSearch.requestFor(latestUser);
+    if(webRequest){
+      job.statusText="Searching the web…";
+      if(job.pendingEl?.status)job.pendingEl.status.textContent=job.statusText;
+      job.webSearch=await window.AtlasWebSearch.lookup(webRequest,job.id);
+      if(secondaryJob!==job)return;
+      if(job.cancelled){finishSecondaryJob(job,{stopped:true,text:"Stopped."});return;}
+    }
+    const context=contextMessages(c,job.choice,job.effort,projectContext,job.webSearch);
     if(context.tooLong){
       secondaryJob=null;job.status="done";
       if(state.activeChatId===c.id)showFriendlyError(`This request exceeds the local model's ${Math.round(contextWindowForChoice(job.choice,state.contextPreferences,job.effort)/1024)}-token window. Shorten it or split it into parts; Atlas kept your full message in this chat.`);
@@ -3930,9 +3951,9 @@ Local date/time: ${current}.${global}${local}`
       const latest=String(latestUser?.content||"");
       const codeContinuation=Boolean(latestUser?.codeContinuation);
       const codeTask=isCodeRequest(latest)||codeContinuation;
-      const finalText=codeTask&&containsUnsupportedToolCallSyntax(generated)?INVALID_CODE_DRAFT_MESSAGE:
+      const finalText=window.AtlasInlineUI.hasUnsupportedToolCall(generated,codeTask)?INVALID_CODE_DRAFT_MESSAGE:
         m?.stopped?generated+"\n\n_Reply stopped._":normalizeCodeResponse(generated,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
-      pushToChat(c,"assistant",finalText,{modelName:modelChoiceNames[job.choice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
+      pushToChat(c,"assistant",finalText,{...(job.webSearch&&!m?.stopped?{webSearch:job.webSearch}:{}),modelName:modelChoiceNames[job.choice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
       if(c.id!==state.activeChatId)showToast(`Reply finished in ${displayTitle(c)}`);
       if(c.id===state.activeChatId)renderCurrent();
       deferredTitleChats.add(c.id);
@@ -4018,7 +4039,8 @@ Local date/time: ${current}.${global}${local}`
     const codeTask=isCodeRequest(latest)||codeContinuation;
     const codingRequest=messageContextContent(latestUser,MAX_COMPOSER_TEXT_CHARS);
     if(latestUser?.mentions?.includes("image")){void generatePoem3Image(codingRequest);return;}
-    const taskFailure=window.AtlasCoding?.explainTaskFailure(latest,c);
+    const webRequest=window.AtlasWebSearch.requestFor(latestUser,undefined);
+    const taskFailure=webRequest?.explicit?null:window.AtlasCoding?.explainTaskFailure(latest,c);
     if(taskFailure&&!latestUser?.attachments?.length&&!latestUser?.mentions?.length){
       pushToChat(c,"assistant",taskFailure);
       return;
@@ -4030,7 +4052,7 @@ Local date/time: ${current}.${global}${local}`
       queueReplyForLoad();void ai._dispose().finally(()=>{state.loading=false;startPreload();});return;
     }
     if(latestUser?.mentions?.includes("ultra-code")&&window.atlasDesktop&&(choice==="apex-ultra"||choice==="ultra-code")&&window.AtlasCoding?.run){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,true,false,false,c.id);return;}
-    if(window.AtlasCoding?.shouldRun(latest,c,codeContinuation)){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,false,false,false,c.id);return;}
+    if(!webRequest?.explicit&&window.AtlasCoding?.shouldRun(latest,c,codeContinuation)){state.pendingChatId=c.id;void window.AtlasCoding.run(codingRequest,null,false,false,false,c.id);return;}
     pendingProjectContextChatId=c.id;
     let projectContext="";
     try{projectContext=await window.AtlasCoding?.projectContextForChat?.(c.id,latest)||"";}
@@ -4041,8 +4063,19 @@ Local date/time: ${current}.${global}${local}`
     beginThinking(c.id);
     state.pendingId=uid();
     state.pendingModelChoice=choice;
+    state.pendingWebSearch=null;
+    if(webRequest){
+      const lookupId=state.pendingId;
+      state.webLookupId=lookupId;
+      setThinkingStatus("Searching the web…");
+      const result=await window.AtlasWebSearch.lookup(webRequest,lookupId);
+      if(state.pendingId!==lookupId)return;
+      state.webLookupId=null;
+      state.pendingWebSearch=result;
+      setThinkingStatus("Thinking");
+    }
 
-    const context=contextMessages(c,choice,state.effort,projectContext);
+    const context=contextMessages(c,choice,state.effort,projectContext,state.pendingWebSearch);
     if(context.tooLong){
       state.generating=false;
       state.pendingEl?.root?.remove();
@@ -4233,7 +4266,7 @@ Local date/time: ${current}.${global}${local}`
       if(attachments.length)c.messages[index].attachments=attachments;
       else delete c.messages[index].attachments;
       if(imageRequest)c.messages[index].mentions=["image"];
-      else if(selectedAction?.id==="ultra-code")c.messages[index].mentions=["ultra-code"];
+      else if(["ultra-code","web-search"].includes(selectedAction?.id))c.messages[index].mentions=[selectedAction.id];
       else if(selectedAction)delete c.messages[index].mentions;
       c.messages[index].ts=Date.now();
       c.messages=c.messages.slice(0,index+1);
@@ -4256,7 +4289,7 @@ Local date/time: ${current}.${global}${local}`
       renderHistory();
       renderCurrent();
 
-      const direct=attachments.length||imageRequest||selectedAction?.id==="ultra-code"||window.AtlasCoding?.shouldRun(messageText)?null:memoryTool(messageText)||greetingTool(messageText)||directTool(messageText);
+      const direct=attachments.length||imageRequest||["ultra-code","web-search"].includes(selectedAction?.id)||window.AtlasWebSearch.requestFor({content:messageText})||window.AtlasCoding?.shouldRun(messageText)?null:memoryTool(messageText)||greetingTool(messageText)||directTool(messageText);
 
       if(direct){
         push("assistant",direct);
@@ -4287,13 +4320,13 @@ Local date/time: ${current}.${global}${local}`
       ...(codeContinuationLanguage?{codeContinuation:true,codeContinuationLanguage}: {})
     });
     if(imageRequest)userMessage.mentions=["image"];
-    else if(selectedAction?.id==="ultra-code")userMessage.mentions=["ultra-code"];
+    else if(["ultra-code","web-search"].includes(selectedAction?.id))userMessage.mentions=[selectedAction.id];
     clearAttachmentDraft();
-    if(imageRequest||selectedAction?.id==="ultra-code")persist();
+    if(userMessage.mentions?.length)persist();
     selectedMentionActions.delete(c.id);
     renderCurrent();
 
-    const direct=attachments.length||imageRequest||selectedAction?.id==="ultra-code"||window.AtlasCoding?.shouldRun(messageText)?null:memoryTool(messageText)||greetingTool(messageText)||directTool(messageText);
+    const direct=attachments.length||imageRequest||["ultra-code","web-search"].includes(selectedAction?.id)||window.AtlasWebSearch.requestFor({content:messageText})||window.AtlasCoding?.shouldRun(messageText)?null:memoryTool(messageText)||greetingTool(messageText)||directTool(messageText);
 
     if(direct){
       push("assistant",direct);
@@ -4546,10 +4579,11 @@ Local date/time: ${current}.${global}${local}`
       const codeContinuation=Boolean(latestUser?.codeContinuation);
       const stoppedText=(generatedText.match(/```/g)||[]).length%2?generatedText+"\n```":generatedText;
       const codeTask=isCodeRequest(latest)||codeContinuation;
-      const finalText=codeTask&&containsUnsupportedToolCallSyntax(generatedText)?INVALID_CODE_DRAFT_MESSAGE:
+      const finalText=window.AtlasInlineUI.hasUnsupportedToolCall(generatedText,codeTask)?INVALID_CODE_DRAFT_MESSAGE:
         m.stopped?stoppedText+"\n\n_Reply stopped._":normalizeCodeResponse(generatedText,latest,codeContinuation,latestUser?.codeContinuationLanguage||"");
-      if(generatedText||!m.stopped)pushToChat(chat,"assistant",finalText,{modelName:modelChoiceNames[state.pendingModelChoice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
+      if(generatedText||!m.stopped)pushToChat(chat,"assistant",finalText,{...(state.pendingWebSearch&&!m.stopped?{webSearch:state.pendingWebSearch}:{}),modelName:modelChoiceNames[state.pendingModelChoice]||"Atlas 7.5 Mini",...(codeContinuation?{codeContinuation:true,codeContinuationLanguage:latestUser?.codeContinuationLanguage||""}:{})});
 
+      state.pendingWebSearch=null;
       if(m.backend) state.backend=m.backend;
       setRailStatus("ready");
 
@@ -4675,6 +4709,9 @@ Local date/time: ${current}.${global}${local}`
       {id:"ultra-code",label:"Atlas 7.5 Code",detail:ultraReady?"Use Atlas 7.5 Code for this request":!window.atlasDesktop?"Available in Atlas desktop":"Select Atlas 7.5 for this optional coding model",disabled:!ultraReady,token:"@Atlas 7.5 Code"},
       {id:"image",label:"Image generation",detail:(navigator.gpu||window.atlasDesktop?.imagePrepare)?"Generate a local image with Image 1.1":"Image generation is unavailable",disabled:!(navigator.gpu||window.atlasDesktop?.imagePrepare),token:"@Image generation"}
     ];
+    if(window.AtlasWebSearch.available())entries.unshift({
+      id:"web-search",label:"Web search",detail:"Find current sources for this reply",token:"@Web search"
+    });
     if(window.atlasDesktop&&projects.length){
       projects.forEach(project=>entries.push({id:"project",label:`Project: ${project.title}`,detail:"Use this project in the current chat",project,token:`@Project: ${project.title}`}));
     }else{
@@ -4711,7 +4748,7 @@ Local date/time: ${current}.${global}${local}`
       else if(state.modelChoice.startsWith("apex-")&&!state.generating&&!state.queued&&!secondaryJob&&!state.loading&&!state.titleGenerating){state.fastMode=!state.fastMode;persistSettings();updateModelControls();showToast(`Fast mode ${state.fastMode?"on":"off"}`);}
     }else if(item.id==="ultra-code"){
       token=item.token;selectedMentionActions.set(chatId,{id:item.id,token});
-    }else if(item.id==="image"){
+    }else if(item.id==="image"||item.id==="web-search"){
       token=item.token;selectedMentionActions.set(chatId,{id:item.id,token});
     }else if(item.id==="project"){
       if(!window.AtlasCoding?.attachChatToProject?.(item.project.id))return;
@@ -5421,12 +5458,14 @@ Local date/time: ${current}.${global}${local}`
       submit();
     }
   });
+  window.AtlasWebSearch.mount($("#settingsWebSearch"));
   send.onclick=()=>{
     if(window.AtlasCoding?.cancel())return;
     const chatId=state.activeChatId;
     if(secondaryJob?.chatId===chatId){
       const job=secondaryJob;
       if(job.status==="starting"||job.status==="context"){
+        if(job.status==="context")void window.AtlasWebSearch.cancel(job.id);
         job.cancelled=true;job.status="cancelling";job.statusText="Stopping…";send.disabled=true;
         if(job.pendingEl?.status)job.pendingEl.status.textContent=job.statusText;
         return;
@@ -5440,7 +5479,13 @@ Local date/time: ${current}.${global}${local}`
     }else if(state.pendingChatId===chatId&&(state.queued||state.generating)){
       if(ai.native&&state.queued){void stopNativeSetup();return;}
       send.disabled=true;
-      if(state.poem3Generating)poem3AbortController?.abort();
+      if(state.webLookupId===state.pendingId&&state.pendingId){
+        const stoppedId=state.webLookupId;
+        state.webLookupId=null;
+        void window.AtlasWebSearch.cancel(stoppedId);
+        state.pendingEl?.root?.remove();
+        ai.onmessage({data:{type:"done",id:stoppedId,stopped:true,text:""}});
+      }else if(state.poem3Generating)poem3AbortController?.abort();
       else ai.postMessage({type:"interrupt"});
     }else{
       submit();

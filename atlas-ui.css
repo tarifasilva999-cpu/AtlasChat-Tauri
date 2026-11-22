@@ -1171,6 +1171,11 @@ html[data-theme="light"] :is(#settingsModal,#memoryModal,#infoModal,#installModa
 .coding-setting-row{font-size:14px}
 .coding-setting-row + .coding-setting-row{border-top:1px solid var(--settings-border)}
 .coding-settings-note{margin:0;color:var(--muted)!important;font-size:13px!important}
+.atlas-search-setting{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.atlas-search-sources{margin:12px 0 0;font-size:.86em;color:var(--text-2)}
+.atlas-search-sources summary{cursor:pointer;width:fit-content}
+.atlas-search-sources ol{padding-inline-start:24px;margin:6px 0 0}
+.atlas-search-sources a{color:inherit;text-underline-offset:3px;overflow-wrap:anywhere}
 .settings-action{
   display:grid;
   grid-template-columns:auto minmax(0,1fr) auto;

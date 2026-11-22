@@ -101,6 +101,10 @@
   function projectIdForChat(chat) {
     return chat?.projectId || [...(chat?.messages || [])].reverse().find(message => message.projectRunId)?.projectRunId || null;
   }
+  function isProjectChatMessage(message) {
+    return message.role === 'user' || (message.role === 'assistant' &&
+      message.kind !== 'coding-project' && !window.AtlasInlineUI?.hasUnsupportedToolCall?.(message.content));
+  }
   function projectModelName(choice) {
     return ({ firefly: 'Atlas 7.5 Mini', forge: 'Atlas 7.5 Mini', 'apex-ultra': 'Atlas 7.5', 'ultra-code': 'Atlas 7.5 Code' })[choice] || 'Atlas';
   }
@@ -134,7 +138,9 @@
     if (window.AtlasInlineUI?.wantsVisual(text)) return false;
     const hasScratch = !projectIdForChat(chat) &&
       (chat?.scratchWorkspaceId || chat?.messages?.some(message => message.scratchRunId));
+    const projectKickoff = /^(?:let['’]?s\s+|please\s+)?(?:begin|start|get started)(?:\s+(?:working(?:\s+on)?|work(?:\s+on)?|on))?\s+(?:this|the|our)\s+project[\s.!]*$/i.test(text.trim());
     if (hasScratch && (codeContinuation || change || failure || fileChange)) return true;
+    if (projectIdForChat(chat) && projectKickoff) return true;
     if (codeContinuation) return false;
     if (projectIdForChat(chat) && (change || failure || fileChange)) return true;
     if (projectIdForChat(chat) && /^(?:yes|yeah|yep|okay|ok|go ahead|do it|sounds good|proceed|please do)(?:[,.!\s]|$)/i.test(text.trim()) &&
@@ -391,7 +397,7 @@
         const summary=String(chat.contextSummary||'').replace(/\s+/g,' ').trim();
         if(summary){const lower=summary.toLowerCase(),score=terms.filter(term=>lower.includes(term)).length+(lower.includes(query)?1:0);if(score)candidates.push({chatId:chat.id,title,role:'saved context',content:excerpt(summary),score,at:chat.updated||0});}
         for(const message of messages){
-          if((message.role!=='user'&&message.role!=='assistant')||message.kind==='coding-project')continue;
+          if(!isProjectChatMessage(message))continue;
           const content=String(message.content||'').replace(/\s+/g,' ').trim(),lower=content.toLowerCase();
           const score=terms.filter(term=>lower.includes(term)).length+(lower.includes(query)?1:0);
           if(score)candidates.push({chatId:chat.id,title,role:message.role,content:excerpt(content),score,at:message.ts||chat.updated||0});
@@ -404,7 +410,6 @@
     if (Number.isInteger(result.revision)) active.revision = result.revision;
     if ((name === 'READ_FILE' || name === 'READ_RANGE') && result.hash) {
       active.hashes.set(result.path, result.hash);
-      if(result.start===1&&!result.truncated)active.completeReads.add(result.path);
     }
     return result;
   }
@@ -439,6 +444,23 @@
       return {name,result:encoded.length>limit?{summary:encoded.slice(0,limit),truncated:true}:result};
     }));
   }
+  function sourceResults(results, completeReads) {
+    const limit = Math.max(200, Math.floor(2100 / results.length) - 200);
+    const output = [];
+    for (const entry of results) {
+      const result = entry.result || {};
+      let content = result.content?.slice(0, limit);
+      if (content !== result.content && content.includes('\n')) content = content.slice(0, content.lastIndexOf('\n'));
+      const clipped = content !== result.content;
+      const item = content === undefined ? {path: result.path, matches: result.matches?.slice(0, 4)} :
+        {path: result.path, start: result.start, end: clipped ? result.start + content.split('\n').length - (content ? 1 : 0) : result.end,
+          totalLines: result.totalLines, content, truncated: Boolean(result.truncated || clipped)};
+      if (JSON.stringify([...output, item]).length > 2000) continue;
+      output.push(item);
+      if (item.start === 1 && !item.truncated) completeReads.add(item.path);
+    }
+    return JSON.stringify(output);
+  }
   function actionSignature({ name, args }) {
     const fields = Object.keys(args).sort().map(key => [key, args[key]]);
     return JSON.stringify([name, fields]);
@@ -461,7 +483,7 @@
         const lower=summary.toLowerCase(),score=terms.filter(term=>lower.includes(term)).length;
         candidates.push({key:chat.id+':summary',line:title+' · saved context: '+excerpt(summary,260),score,at:chat.updated||0,recent:chatIndex<4});
       }
-      const messages=(chat.messages||[]).filter(message=>(message.role==='user'||message.role==='assistant')&&message.kind!=='coding-project').slice(-40);
+      const messages=(chat.messages||[]).filter(isProjectChatMessage).slice(-40);
       messages.forEach((message,index)=>{
         const content=String(message.content||'').replace(/\s+/g,' ').trim();
         if(!content)return;
@@ -482,8 +504,7 @@
   function currentChatContext(chatId) {
     const chat=hooks.state.chats.find(item=>item.id===chatId);
     if(!chat)return '';
-    let messages=(chat.messages||[]).filter(message=>(message.role==='user'||message.role==='assistant')&&message.kind!=='coding-project');
-    if(messages.at(-1)?.kind==='coding-project')messages=messages.slice(0,-1);
+    let messages=(chat.messages||[]).filter(isProjectChatMessage);
     if(messages.at(-1)?.role==='user')messages=messages.slice(0,-1);
     return messages.slice(-4).map(message=>{
       const content=String(message.content||'').replace(/\s+/g,' ').trim();
@@ -532,11 +553,16 @@
     const context = await command('SELECT_CONTEXT', { request: request + ' ' + failure.slice(0,500), budget: 1800 });
     await stage('Context', 'Using the project brief and recent project work. Relevant file excerpts: '+(context.files.map(file=>file.path).join(', ')||'none selected')+'.');
     for (const f of context.files) active.hashes.set(f.path,f.hash);
-    let sourceEvidence = contextData(context).slice(0, 2000);
+    const initialSources = context.files.map(result => ({result}));
+    let sourceEvidence = sourceResults(initialSources, active.completeReads);
     let evidence = '', progress = '', recovery = '', stalled = 0, focusEdit = false;
     const recentActions = [], createdFiles = new Map();
     const recentReads = [];
     const actionsAtCurrentSource = new Set();
+    const readResults = new Set();
+    const behaviorTests = plan.runtime === 'web'
+      ? ' For interactive changes, add or update project.tests.json with a test that clicks the actual control and asserts the changed state, then checks reversal where applicable. Use {"tests":[{"name":"descriptive name","steps":[{"action":"click","selector":"#control"},{"action":"assert","selector":"#target","property":"attribute","attribute":"data-state","equals":"expected"}]}]}. If the browser check only reports missing tests, add the assertions with the app code unchanged. Use local files in browser previews.'
+      : '';
     for (;;) {
       stopped();
       const prompt = 'Project task: ' + request + '\nWorkspace action feedback: ' + recovery +
@@ -557,7 +583,7 @@
         'The file index already lists existing files. Use the source excerpts to edit directly when they include an exact, unique PATCH_FILE anchor. If you need more code, read one specific file or range and use the result in your next action. Preserve existing interfaces. WRITE_FILE requires a complete prior read. ' +
         'Set done:true with the final write or with an empty commands array after the requested edits are saved. Atlas runs checks after done. A successful read alone does not complete an edit. ' +
         (active.temporary ? 'Deliver self-contained requests in one runnable file when practical. Respect the requested filename and include brief usage instructions in that file. Use separate source files, assets, or tests when the task needs them. ' :
-          'Create real tests and run instructions. Web needs project.tests.json: {"tests":[{"name":"click works","steps":[{"action":"click","selector":"#button"},{"action":"assert","selector":"#result","property":"text","equals":"expected"}]}]}. ') +
+          'Create real tests and run instructions. ') + behaviorTests +
         'Use standard libraries where possible. No fake binary assets, placeholders, or claims of execution. ' +
         (window.AtlasInlineUI?.designGuidance ? 'For visual interfaces only: ' + window.AtlasInlineUI.designGuidance : '');
       const details = '\nRecent messages in this chat: ' + currentChatContext(active.chat.id) +
@@ -571,10 +597,11 @@
         '\nSource excerpts: ' + sourceEvidence +
         '\nCheck failure (if any): ' + failure.slice(0, 1000) +
         '\nReturn {"commands":[{"name":"PATCH_FILE","args":{"path":"file","search":"exact unique text","replace":"updated text"}}],"done":true,"summary":"short description"}. ' +
-        'Use up to four edits. Prefer PATCH_FILE with a short exact anchor copied from the source, or use WRITE_FILE(path,content) when the entire file was read. ' +
+        'Use up to four edits. For a short complete file shown from line 1 with truncated:false, WRITE_FILE(path,content) can preserve and update the entire file. For partial files, copy a short exact anchor for PATCH_FILE. ' +
         'Keep existing content and structure. For interactive changes, trace the control, handler, state and visible result together. ' +
         'Set done:true with the final edits. Use done:false and name the remaining edit only if more work is needed. ' +
-        (active.mutations > beforeMutations ? 'If the saved changes already fulfill the request, return {"commands":[],"done":true,"summary":"short description"}.' : '');
+        (active.mutations > beforeMutations ? 'If the saved changes already fulfill the request, return {"commands":[],"done":true,"summary":"short description"}.' : '') +
+        behaviorTests;
       const response = await completeJSON(focusEdit ? editPrompt : prompt, active.limitGeneration ? 2000 : 4600, focusEdit ? '' : details, {
         kind: focusEdit ? 'project-edit' : 'project-action', chunked: true,
         valid: ({ commands, done }) => (done === true && (commands === undefined || (Array.isArray(commands) && commands.length === 0))) ||
@@ -606,26 +633,43 @@
           await stage(failure ? 'Fixing' : 'Writing files', String(args.path || tool.name));
         }
         try {
+          if (['PATCH_FILE', 'DELETE_FILE', 'MOVE_FILE', 'RENAME_FILE'].includes(tool.name) && !args.baseHash &&
+              active.fileIndex.some(file => file.path === args.path)) throw new Error('Read the target file before editing it.');
           if(tool.name==='WRITE_FILE'&&(active.fileIndex||[]).some(file=>file.path===args.path)&&!active.completeReads.has(args.path))throw new Error('Read the entire file before replacing it, or use PATCH_FILE for a targeted change.');
           const startedFile = createdFiles.get(args.path);
           if (tool.name === 'APPEND_FILE') {
             if (!startedFile) throw new Error('Append only to a file created in this pass. Use a targeted patch for existing files.');
             args.baseHash = startedFile.hash;
           }
-          const result = await command(tool.name,args); results.push({name:tool.name,result});
+          const result = await command(tool.name,args);
+          if (result.content !== undefined) {
+            const readKey = JSON.stringify([result.path, result.hash, result.start, result.content]);
+            if (readResults.has(readKey)) {
+              repeatedRead = true;
+              results.push({name:tool.name,error:'This range returned source already provided. Use its contents to make the edit.'});
+              continue;
+            }
+            readResults.add(readKey);
+          }
+          results.push({name:tool.name,result});
           if (READ_TOOLS.includes(tool.name)) await stage('Inspecting', tool.name.replaceAll('_',' ').toLowerCase() + (args.path ? ' · ' + args.path : args.query ? ' · ' + String(args.query).slice(0,100) : ''));
           if (result.sourceHash && result.sourceHash !== previousSourceHash) {
             active.sourceHash = result.sourceHash;
             active.mutations++;
             actionsAtCurrentSource.clear();
-            sourceEvidence = '';
-            recentReads.length = 0;
+            readResults.clear();
             const latest = await bridge.read(active.id);
             active.fileIndex = latest.files || active.fileIndex;
             const savedFile = active.fileIndex.find(file => file.path === args.path);
             if (savedFile) active.hashes.set(args.path, savedFile.hash);
             else active.hashes.delete(args.path);
             active.completeReads.delete(args.path);
+            const remaining = [...new Map([...initialSources, ...recentReads]
+              .filter(({result}) => result.content !== undefined && active.fileIndex.some(file =>
+                file.path === result.path && file.hash === result.hash))
+              .map(entry => [entry.result.path, entry])).values()].slice(-3);
+            recentReads.splice(0, recentReads.length, ...remaining);
+            sourceEvidence = sourceResults(recentReads, active.completeReads);
             if (savedFile && !savedFile.binary && (tool.name === 'CREATE_FILE' || tool.name === 'APPEND_FILE')) {
               const tail = ((tool.name === 'APPEND_FILE' ? startedFile.tail : '') + args.content).slice(-600);
               createdFiles.delete(args.path);
@@ -650,7 +694,7 @@
       if (reads.length) {
         recentReads.unshift(...reads);
         recentReads.splice(3);
-        sourceEvidence = resultData(recentReads).slice(0, 2000);
+        sourceEvidence = sourceResults(recentReads, active.completeReads);
       }
       const errors = results.filter(result => result.error);
       const otherResults = [...errors, ...results.filter(result => !result.error && !reads.includes(result))];
@@ -661,7 +705,7 @@
       }
       if (active.mutations > mutationsAtStart) stalled = 0;
       else if (errors.length || response.done) stalled++;
-      focusEdit = repeatedRead && recentReads.length > 0;
+      focusEdit = (repeatedRead || (!focusEdit && errors.some(({name}) => name === 'PATCH_FILE'))) && sourceEvidence !== '[]';
       recovery = errors.length || response.done
         ? (errors.length ? 'Some actions failed or were repeated. Use the feedback below and choose a different action. ' : 'No source edits have been saved for this pass. ') +
           (active.mutations > beforeMutations
@@ -846,7 +890,8 @@
               result?.passed ? (result.behaviorVerified ? 'Behavior checks passed.' : 'The available checks passed.') :
               result?.needsPreview ? 'Behavior verification is incomplete.' :
               result?.executed ? 'Checks did not pass.' : 'Code not run.';
-            message.content = [summary, verification, result?.passed || active.stopped || message.projectTaskError ? '' : result?.reason].filter(Boolean).join(' ');
+            const completedSummary = !active.stopped && !message.projectTaskError && (!result?.executed || result?.passed) ? summary : '';
+            message.content = [completedSummary, verification, result?.passed || active.stopped || message.projectTaskError ? '' : result?.reason].filter(Boolean).join(' ');
             if (active.mutations && done.files.length) {
               try {
                 const artifact = await bridge.projectCommand({id:done.id,name:'SAVE_CODING_ARTIFACT',
@@ -854,7 +899,7 @@
                 if (artifact) {
                   message.codingArtifact = {...artifact, draft:active.stopped || !!message.projectTaskError ||
                     (result?.executed && !result.passed)};
-                  if (!summary) message.content = 'I saved the workspace files. ' + message.content;
+                  if (!completedSummary) message.content = 'I saved the workspace files. ' + message.content;
                 }
               } catch (error) {
                 message.content += ' The download could not be saved. ' + error.message;

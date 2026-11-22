@@ -75,7 +75,14 @@ Use one atlas-ui fenced block (atlas-ui-wide for a genuinely wider visual). Put 
     const number=Number(value);
     return Number.isFinite(number)&&number>0?Math.round(Math.min(max,Math.max(min,number))):null;
   }
-  const api={hasPlan,parsePlan,instructions,designGuidance,wantsVisual,wantsStandalone,wantsArchive};
+  function hasUnsupportedToolCall(value, includeFencedCode = false) {
+    const text = String(value || '');
+    const source = includeFencedCode ? text : text.replace(/^[ \t]*`{3}[^\r\n]*\r?\n[\s\S]*?(?:^[ \t]*`{3}[^\r\n]*|(?![\s\S]))/gm, '');
+    return /<\|(?:tool_call|tool_result|tool_response)(?:\|)?>|<\/(?:tool_call|tool_result|tool_response)>/i.test(source) ||
+      /\bcall:(?:CodeEdit|CodeInterpreter)\s*\{/i.test(source) ||
+      /\b(?:file_path|old_string|new_string)\s*:\s*<\|/i.test(source);
+  }
+  const api={hasPlan,parsePlan,instructions,designGuidance,wantsVisual,wantsStandalone,wantsArchive,hasUnsupportedToolCall};
   if(typeof module!=="undefined"&&module.exports)module.exports={...api,safeCSS,plainText,preferredSize};
   if(typeof document==="undefined")return;
   const records=new WeakMap();

@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {hasPlan,parsePlan,safeCSS,plainText}=require('../atlas-inline-ui.js');
+const {hasPlan,parsePlan,safeCSS,plainText,hasUnsupportedToolCall}=require('../atlas-inline-ui.js');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
@@ -73,6 +73,15 @@ test('formatted message copying yields headings and lists without Markdown synta
   assert.match(copied,/# Keep this code comment/);
 });
 
+test('ordinary replies reject serialized model commands while explanatory code fences remain readable',()=>{
+  const draft='I will start the project.\n\n<|tool_call>call:CodeEdit{file_path:"/home/user1/projects/KATCH/src/index.html",new_string:<|">example<|">}<tool_call|>';
+  assert.equal(hasUnsupportedToolCall(draft),true);
+  assert.equal(hasUnsupportedToolCall('I saw CodeEdit mentioned in the log.'),false);
+  const fenced='Here is an example:\n\n```text\nExample payload\n'+draft+'\n```';
+  assert.equal(hasUnsupportedToolCall(fenced),false);
+  assert.equal(hasUnsupportedToolCall(fenced,true),true);
+  assert.equal(hasUnsupportedToolCall(fenced+'\n'+draft),true);
+});
 test('both chat entry points and the shared renderer have valid JavaScript syntax',()=>{
   for(const name of ['Atlas-CHAT.html','index.html']){
     const source=fs.readFileSync(path.join(__dirname,'..',name),'utf8');
