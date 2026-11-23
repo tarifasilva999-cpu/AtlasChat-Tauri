@@ -285,17 +285,19 @@ class NativeInference {
           ...(kind === 'project-html' ? { response_format: { type: 'json_object', schema: {
             type: 'object', properties: { html: { type: 'string' } }, required: ['html'], additionalProperties: false
           } } } : {}),
-          top_p: 0.9, min_p: 0, repeat_penalty: 1.1, chat_template_kwargs: { enable_thinking: false } })
+          top_p: 0.9, min_p: 0, repeat_penalty: 1.1, chat_template_kwargs: { enable_thinking: true } })
       });
       if (!response.ok || !response.body) {
         const detail = await response.json().catch(() => null);
         throw failure(String(detail?.error?.message || `The local model returned HTTP ${response.status}.`).slice(0,500));
       }
       for await (const chunk of readSSE(response.body, signal)) {
-        const delta = String(chunk.choices?.[0]?.delta?.content || '');
-        if (delta) { text += delta; armIdle(); }
+        const choice = chunk.choices?.[0];
+        const delta = String(choice?.delta?.content || '');
+        if (delta || choice?.delta?.reasoning_content) armIdle();
+        if (delta) text += delta;
         if (text.length > 2 * 1024 ** 2) throw failure('The local reply exceeded its size limit.');
-        finishReason = chunk.choices?.[0]?.finish_reason || finishReason;
+        finishReason = choice?.finish_reason || finishReason;
         this.emit({ type: 'chunk', id, chunk });
       }
       signal.throwIfAborted();

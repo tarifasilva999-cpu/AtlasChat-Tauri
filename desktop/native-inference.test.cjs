@@ -112,6 +112,7 @@ test('native requests are authenticated on loopback and stream real tokens withi
     assert.equal(url, 'http://127.0.0.1:12345/v1/chat/completions');
     assert.equal(init.headers.Authorization, 'Bearer test-secret');
     const body = JSON.parse(init.body); assert.equal(body.max_tokens, 6000); assert.equal(body.stream, true);
+    assert.equal(body.chat_template_kwargs.enable_thinking, true);
     assert.equal(body.response_format?.type, expectedFormat?.type);
     assert.deepEqual(body.response_format?.schema?.required, expectedFormat?.required);
     assert.deepEqual(body.response_format?.schema?.properties.commands?.items.properties.name.enum, expectedFormat?.editCommands);
